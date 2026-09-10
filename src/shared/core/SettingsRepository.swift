@@ -25,7 +25,7 @@ struct SettingsRepository: Sendable {
             throw OneClickCoreError.cannotReadSettings
         }
 
-        let settings: Settings
+        var settings: Settings
         do {
             settings = try JSONDecoder().decode(Settings.self, from: data)
         } catch {
@@ -33,6 +33,20 @@ struct SettingsRepository: Sendable {
         }
 
         try validate(settings)
+        // Remove retired presets without removing applications imported by the user.
+        let retiredPresets: [String: String] = [
+            "vscode": "com.microsoft.VSCode",
+            "cursor": "com.todesktop.230313mzl4w4u92",
+            "sublime": "com.sublimetext.4",
+            "terminal": "com.apple.Terminal",
+        ]
+        settings.targets.removeAll { target in
+            target.applicationURL == nil
+                && retiredPresets[target.id].map { $0 == target.bundleIdentifier } == true
+        }
+        if settings.targets.isEmpty {
+            settings.targets = OpenTarget.builtIns
+        }
         return settings
     }
 

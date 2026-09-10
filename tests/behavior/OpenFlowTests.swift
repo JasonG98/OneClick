@@ -7,9 +7,9 @@ struct OpenFlowTests {
     @Test func finderRequestReachesHostExactlyOnce() async throws {
         let files = try TemporaryFiles()
         let url = try files.file("中文 + # & ' demo")
-        try files.settings.save(Settings())
+        try files.settings.save(Settings(targets: sampleTargets))
         let workspace = RecordingWorkspace()
-        try await OpenRequestDispatcher(repository: { files.requests }, workspace: workspace).open(OpenTarget.builtIns[0], selection: selection([url]))
+        try await OpenRequestDispatcher(repository: { files.requests }, workspace: workspace).open(sampleTargets[0], selection: selection([url]))
         let link = try #require(workspace.links.first)
         #expect(!link.activates)
         let id = try #require(OpenRequestLink.requestID(for: link.url))
@@ -25,7 +25,7 @@ struct OpenFlowTests {
         let workspace = RecordingWorkspace()
         workspace.failure = .unavailable
         await #expect(throws: TestFailure.unavailable) {
-            try await OpenRequestDispatcher(repository: { files.requests }, workspace: workspace).open(OpenTarget.builtIns[3], selection: selection([files.root]))
+            try await OpenRequestDispatcher(repository: { files.requests }, workspace: workspace).open(sampleTargets[3], selection: selection([files.root]))
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: files.root.path).isEmpty)
     }
@@ -33,14 +33,14 @@ struct OpenFlowTests {
     @Test(arguments: ["disabled", "removed"])
     func hostRechecksTargetAfterMenuWasCreated(change: String) async throws {
         let files = try TemporaryFiles()
-        let id = try files.requests.enqueue(targetID: "vscode", urls: [files.root])
-        var settings = Settings()
+        let id = try files.requests.enqueue(targetID: "test-vscode", urls: [files.root])
+        var settings = Settings(targets: sampleTargets)
         if change == "disabled" { settings.targets[0].isEnabled = false }
         else { settings.targets.removeFirst() }
         try files.settings.save(settings)
         let workspace = RecordingWorkspace()
         let handler = OpenRequestHandler(requests: files.requests, settings: files.settings, executor: ActionExecutor(workspace: workspace))
-        await #expect(throws: PlatformError.applicationUnavailable("vscode")) { try await handler.open(id) }
+        await #expect(throws: PlatformError.applicationUnavailable("test-vscode")) { try await handler.open(id) }
         #expect(workspace.files.isEmpty)
         #expect(throws: (any Error).self) { try files.requests.consume(id: id) }
     }

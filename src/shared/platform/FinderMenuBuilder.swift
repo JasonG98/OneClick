@@ -9,20 +9,31 @@ struct FinderMenuBuilder {
                   handler: AnyObject? = nil, openAction: Selector? = nil, copyAction: Selector? = nil) -> NSMenu? {
         guard !selection.urls.isEmpty else { return nil }
         let menu = NSMenu()
-        let targets = settings.targets.filter { $0.isEnabled && available($0) }
-        if !targets.isEmpty {
-            let open = NSMenuItem(title: "在应用中打开", action: nil, keyEquivalent: "")
-            open.image = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil)
-            let submenu = NSMenu()
-            for target in targets {
-                let item = NSMenuItem(title: target.name, action: openAction, keyEquivalent: "")
-                item.target = handler
-                item.tag = actions.insert(selection: selection, target: target)
-                let image = icon(target)?.copy() as? NSImage
-                image?.size = NSSize(width: 16, height: 16)
-                item.image = image
+        let onlyDirectories = selection.urls.allSatisfy { url in
+            guard url.isLocalFileURL else { return false }
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+                && isDirectory.boolValue
+        }
+        let targets = onlyDirectories ? settings.targets.filter { $0.isEnabled && available($0) } : []
+        let submenu = NSMenu()
+        for (index, target) in targets.enumerated() {
+            let title = index < 3 ? "在 \(target.name) 中打开" : target.name
+            let item = NSMenuItem(title: title, action: openAction, keyEquivalent: "")
+            item.target = handler
+            item.tag = actions.insert(selection: selection, target: target)
+            let image = icon(target)?.copy() as? NSImage
+            image?.size = NSSize(width: 16, height: 16)
+            item.image = image
+            if index < 3 {
+                menu.addItem(item)
+            } else {
                 submenu.addItem(item)
             }
+        }
+        if !submenu.items.isEmpty {
+            let open = NSMenuItem(title: "在应用中打开", action: nil, keyEquivalent: "")
+            open.image = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil)
             open.submenu = submenu
             menu.addItem(open)
         }

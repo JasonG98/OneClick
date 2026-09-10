@@ -9,23 +9,24 @@ struct SettingsModelTests {
         let model = harness.model()
         #expect(model.configurationAvailable)
         #expect(try harness.files.settings.load().directories == [harness.files.root])
-        model.setEnabled("vscode", false)
+        model.setEnabled("claude", false)
         model.settings.copiesPaths = false
         model.save()
         let reloaded = harness.model()
-        #expect(reloaded.settings.targets.first { $0.id == "vscode" }?.isEnabled == false)
+        #expect(reloaded.settings.targets.first { $0.id == "claude" }?.isEnabled == false)
         #expect(!reloaded.settings.copiesPaths)
         #expect(harness.notifications == 2)
     }
 
     @Test func bothReorderInteractionsPersistTheRequestedOrder() throws {
         let harness = try SettingsHarness()
+        try harness.files.settings.save(Settings(targets: sampleTargets))
         let model = harness.model()
-        model.move("terminal", by: -1)
-        #expect(try harness.files.settings.load().targets.map(\.id) == ["vscode", "cursor", "terminal", "sublime", "claude"])
+        model.move("test-terminal", by: -1)
+        #expect(try harness.files.settings.load().targets.map(\.id) == ["test-vscode", "test-cursor", "test-terminal", "test-sublime", "claude"])
         model.move(from: IndexSet([0, 2]), to: 5)
-        #expect(try harness.files.settings.load().targets.map(\.id) == ["cursor", "sublime", "claude", "vscode", "terminal"])
-        model.move("cursor", by: -1)
+        #expect(try harness.files.settings.load().targets.map(\.id) == ["test-cursor", "test-sublime", "claude", "test-vscode", "test-terminal"])
+        model.move("test-cursor", by: -1)
         model.move("unknown", by: 1)
         #expect(harness.notifications == 2)
     }
@@ -40,9 +41,9 @@ struct SettingsModelTests {
         let added = try #require(try harness.files.settings.load().targets.first { $0.bundleIdentifier == "test.editor" })
         #expect(added.name == "My Editor")
         #expect(added.applicationURL == app)
-        #expect(model.settings.targets.count == 6)
+        #expect(model.settings.targets.count == 2)
         model.remove(added.id)
-        #expect(try harness.files.settings.load().targets.map(\.id) == ["vscode", "cursor", "sublime", "terminal", "claude"])
+        #expect(try harness.files.settings.load().targets.map(\.id) == ["claude"])
     }
 
     @Test func directoryChangesDeduplicateAndPersist() throws {
@@ -57,16 +58,17 @@ struct SettingsModelTests {
 
     @Test func refreshReflectsInstallationAndExtensionChanges() throws {
         let harness = try SettingsHarness()
+        try harness.files.settings.save(Settings(targets: sampleTargets))
         let model = harness.model()
         #expect(model.availableCount == 2)
-        model.setEnabled("terminal", false)
+        model.setEnabled("test-terminal", false)
         #expect(model.availableCount == 1)
-        harness.availableIDs = ["sublime"]
+        harness.availableIDs = ["test-sublime"]
         harness.extensionEnabled = true
         model.refresh()
         #expect(model.availableCount == 1)
-        #expect(model.availableApplications["vscode"] == nil)
-        #expect(model.availableApplications["sublime"] != nil)
+        #expect(model.availableApplications["test-vscode"] == nil)
+        #expect(model.availableApplications["test-sublime"] != nil)
         #expect(model.extensionEnabled)
     }
 
@@ -78,7 +80,7 @@ struct SettingsModelTests {
         let model = harness.model()
         #expect(!model.configurationAvailable)
         #expect(model.errorMessage != nil)
-        model.setEnabled("vscode", false)
+        model.setEnabled("claude", false)
         #expect(try Data(contentsOf: url) == invalid)
         #expect(harness.notifications == 0)
     }
@@ -89,7 +91,7 @@ struct SettingsModelTests {
         let url = harness.files.root.appendingPathComponent("settings.json")
         try FileManager.default.removeItem(at: url)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        model.setEnabled("vscode", false)
+        model.setEnabled("claude", false)
         #expect(model.errorMessage != nil)
         #expect(harness.notifications == 0)
     }

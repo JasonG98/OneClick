@@ -2,6 +2,29 @@ import Foundation
 import Testing
 @testable import OneClickCore
 
+@Test func loadingLegacyDefaultsRemovesOnlyPresetsAndPreservesUserChoices() throws {
+    try withRepositoryFixture { root, fileURL in
+        let presets = [
+            OpenTarget(id: "vscode", name: "Visual Studio Code", kind: .application, bundleIdentifier: "com.microsoft.VSCode", isEnabled: false),
+            OpenTarget(id: "cursor", name: "Cursor", kind: .application, bundleIdentifier: "com.todesktop.230313mzl4w4u92", isEnabled: true),
+            OpenTarget(id: "sublime", name: "Sublime Text", kind: .application, bundleIdentifier: "com.sublimetext.4", isEnabled: true),
+            OpenTarget(id: "terminal", name: "Terminal", kind: .terminal, bundleIdentifier: "com.apple.Terminal", isEnabled: true),
+        ]
+        let imported = OpenTarget(id: "user-editor", name: "Visual Studio Code", kind: .application, bundleIdentifier: "com.microsoft.VSCode", applicationURL: root.appendingPathComponent("Code.app"), isEnabled: true)
+        var claude = try #require(OpenTarget.builtIns.first { $0.id == "claude" })
+        claude.isEnabled = false
+        let old = Settings(targets: [imported] + presets + [claude], copiesPaths: false, directories: [root])
+        try JSONEncoder().encode(old).write(to: fileURL)
+        let repository = SettingsRepository(fileURL: fileURL)
+        let loaded = try repository.load()
+        #expect(loaded.targets == [imported, claude])
+        #expect(!loaded.copiesPaths)
+        #expect(loaded.directories == [root])
+        try repository.save(loaded)
+        #expect(try repository.load() == loaded)
+    }
+}
+
 @Test func missingSettingsReturnEmptyDirectoryDefaults() throws {
     try withRepositoryFixture { _, fileURL in
         let settings = try SettingsRepository(fileURL: fileURL).load()

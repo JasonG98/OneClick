@@ -70,7 +70,7 @@ final class RecordingWorkspace: WorkspaceOpening {
 @MainActor
 final class SettingsHarness {
     let files: TemporaryFiles
-    var availableIDs: Set<String> = ["terminal", "vscode"]
+    var availableIDs: Set<String> = ["test-terminal", "test-vscode"]
     var extensionEnabled = false
     var notifications = 0
 
@@ -92,3 +92,39 @@ final class SettingsHarness {
 func selection(_ urls: [URL]) -> SelectionContext {
     SelectionContext(selected: urls, targeted: nil, isContainer: false)
 }
+
+// Explicit multi-application fixtures, independent of the default settings.
+let sampleTargets: [OpenTarget] = [
+        OpenTarget(
+            id: "test-vscode",
+            name: "Visual Studio Code",
+            kind: .application,
+            bundleIdentifier: "com.microsoft.VSCode",
+            applicationURL: nil,
+            isEnabled: true
+        ),
+        OpenTarget(
+            id: "test-cursor",
+            name: "Cursor",
+            kind: .application,
+            bundleIdentifier: "com.todesktop.230313mzl4w4u92",
+            applicationURL: nil,
+            isEnabled: true
+        ),
+        OpenTarget(
+            id: "test-sublime",
+            name: "Sublime Text",
+            kind: .application,
+            bundleIdentifier: "com.sublimetext.4",
+            applicationURL: nil,
+            isEnabled: true
+        ),
+        OpenTarget(
+            id: "test-terminal",
+            name: "Terminal",
+            kind: .terminal,
+            bundleIdentifier: "com.apple.Terminal",
+            applicationURL: nil,
+            isEnabled: true
+        ),
+] + OpenTarget.builtIns

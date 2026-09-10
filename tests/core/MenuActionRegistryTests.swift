@@ -13,12 +13,12 @@ import Testing
         targeted: nil,
         isContainer: false
     )
-    var firstTarget = OpenTarget.builtIns[0]
+    var firstTarget = OpenTarget(id: "vscode", name: "Code", kind: .application, bundleIdentifier: "com.microsoft.VSCode", isEnabled: true)
     var registry = MenuActionRegistry()
 
     let firstTag = registry.insert(selection: firstSelection, target: firstTarget)
     firstTarget.id = "mutated-after-insert"
-    let secondTag = registry.insert(selection: secondSelection, target: OpenTarget.builtIns[1])
+    let secondTag = registry.insert(selection: secondSelection, target: OpenTarget(id: "cursor", name: "Cursor", kind: .application, bundleIdentifier: "com.todesktop.230313mzl4w4u92", isEnabled: true))
 
     let retainedFirst = try #require(registry.action(for: firstTag))
     let retainedSecond = try #require(registry.action(for: secondTag))

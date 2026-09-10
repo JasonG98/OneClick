@@ -6,9 +6,9 @@
 
 ## 功能
 
-- **在应用中打开**：内置 Visual Studio Code、Cursor、Sublime Text、Terminal、Claude Code，可添加其他 `.app`、开关和排序。
+- **在应用中打开**：仅内置 Claude Code，其他应用由用户导入 `.app`，支持开关和排序。仅在选中项目全部为文件夹或在文件夹空白处右键时显示；前 3 个已启用且可用的应用直接显示，其余折叠到子菜单。选中文件或混选时使用系统“打开方式”。旧配置中的四个预置应用会自动移除，用户导入的应用保留。
 - **复制绝对路径**：保留中文、空格和特殊符号；多选时每行一个路径。
-- **文件夹空白处**：操作当前目录。Terminal 和 Claude Code 遇到文件时使用其父目录，多选目录会去重。
+- **文件夹空白处**：操作当前目录。Claude Code 遇到文件时使用其父目录，多选目录会去重。
 - 独立配置窗口；配置自动保存，Finder 扩展由系统管理。
 
 ## 本地构建
@@ -39,7 +39,7 @@ DEVELOPMENT_TEAM = 你的十位TeamID
 
 ## Claude Code
 
-通过官方 `claude-cli://open?cwd=…` 深链接启动，仅传目录。终端沿用 Claude Code 最近使用的受支持终端；与列表里的 macOS Terminal 开关独立。
+通过官方 `claude-cli://open?cwd=…` 深链接启动，仅传目录。终端沿用 Claude Code 最近使用的受支持终端。
 
 必须先安装 Claude Code 并注册有效的 URL Handler；配置窗口会隐藏不可用的菜单入口。若安装升级后 Handler 指向已删除的旧版本，需要按 Claude Code 的流程重新注册。[Claude Code 深链接文档](https://code.claude.com/docs/en/deep-links)。
 

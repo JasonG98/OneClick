@@ -16,38 +16,6 @@ struct OpenTarget: Codable, Identifiable, Equatable, Sendable {
 
     static let builtIns: [OpenTarget] = [
         OpenTarget(
-            id: "vscode",
-            name: "Visual Studio Code",
-            kind: .application,
-            bundleIdentifier: "com.microsoft.VSCode",
-            applicationURL: nil,
-            isEnabled: true
-        ),
-        OpenTarget(
-            id: "cursor",
-            name: "Cursor",
-            kind: .application,
-            bundleIdentifier: "com.todesktop.230313mzl4w4u92",
-            applicationURL: nil,
-            isEnabled: true
-        ),
-        OpenTarget(
-            id: "sublime",
-            name: "Sublime Text",
-            kind: .application,
-            bundleIdentifier: "com.sublimetext.4",
-            applicationURL: nil,
-            isEnabled: true
-        ),
-        OpenTarget(
-            id: "terminal",
-            name: "Terminal",
-            kind: .terminal,
-            bundleIdentifier: "com.apple.Terminal",
-            applicationURL: nil,
-            isEnabled: true
-        ),
-        OpenTarget(
             id: "claude",
             name: "Claude Code",
             kind: .claude,

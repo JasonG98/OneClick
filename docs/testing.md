@@ -12,6 +12,7 @@
 | ActionExecutorTests | 编辑器/Terminal/Claude 分流，目录去重，特殊字符，失效选择，错误传递，复制文本 | NSWorkspace 和系统剪贴板 |
 | OpenFlowTests | 发起请求 → 临时文件 → 唤醒链接 → 主应用重新读取配置 → 消费与执行；失败清理、禁止重放、13 类非法链接 | 主应用唤醒、目标应用启动 |
 | AppGroupAccessTests | 缺少/错误签名必须在容器访问前失败；正确团队和不可用容器 | 受保护容器查询 |
+| AppLifecycleTests | 普通启动与重新打开请求设置、无关 URL 不请求设置、关闭窗口不退出 | 设置窗口展示回调 |
 | ReleaseScripts | 版本、架构、公证与 Cask 生成的输入输出和失败分支 | Apple/Homebrew 外部命令 |
 
 `tests/behavior/TestSupport.swift` 的替身只记录系统调用边界的参数和错误。配置和请求仓库、菜单生成和动作分流始终使用生产实现；每个测试创建独立临时目录并在结束后清理。
@@ -37,5 +38,7 @@ SwiftPM 覆盖率文件位于 `.build/core/*/debug/codecov/`。嵌套沙盒环�
 ## GUI 验收边界
 
 Computer Use 用于自动化测试无法证明的部分：Finder 实际加载与菜单显示、系统权限对话框、真实应用接收行为、玻璃材质及布局。只有相关系统集成或视觉代码变更时才重测这些项目。设置增删、排序、分流、路径处理和错误分支的日常回归使用上面的测试。
+
+修改窗口生命周期时，额外验证：退出 OneClick 后从 Finder 打开测试文件；主动打开设置并关闭，再从 Finder 打开文件；重新主动打开 OneClick。前两种请求完成时日志应显示 `visible windows: 0, active: false`，最后一种应显示设置窗口。单元测试无法验证 SwiftUI 的 URL 场景路由，不能代替这个检查。
 
 系统替身不能证明 Apple 的签名授权、Finder 的进程间序列化或 Claude Handler 的安装正确；这些边界仍需要少量真实集成验收，不能用单元测试通过来代替。

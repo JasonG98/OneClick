@@ -2,6 +2,14 @@
 
 日期：2026-09-10。环境：macOS 26.6.2、Apple Silicon、Xcode 26.6、Swift 6.3.3。
 
+## Finder 静默唤醒修复
+
+- 设置场景禁用默认启动展示、窗口恢复和外部 URL 路由；URL 由 AppDelegate 处理。普通启动、重新打开及设置菜单显式展示窗口。后台请求不初始化设置模型。
+- 新增 4 项 AppLifecycleTests。`./script/check.sh --build --disable-sandbox`：68 项 Swift 测试、6 项发布脚本测试、Shell 语法检查、主应用及扩展的 arm64 构建通过。
+- 签名开发版实测 Finder → Sublime Text 打开 `.build/fixtures/sample.txt`，冷启动及关闭设置后的请求均记录 `visible windows: 0, active: false`；Sublime Text 显示测试文件。
+- 普通启动显示设置，关闭后再次主动打开也能显示设置。通过 Computer Use 检查实际窗口，并用应用日志核对后台状态；未重启 Finder。
+- 单独禁止默认窗口展示仍会被 SwiftUI 的 URL 场景路由创建窗口；必须同时排除设置场景的外部事件。运行日志位于 `.build/logs/lifecycle-runtime.log`，测试日志位于 `.build/logs/lifecycle-check.log`。
+
 ## 自动化覆盖补齐
 
 - 新增 24 项 Swift Testing 行为测试，覆盖配置模型、真实 NSMenu、应用动作、请求传递及共享容器访问前检查；原有 40 项核心测试保留。
@@ -47,6 +55,6 @@
 - Claude Code：本机 Handler 的可执行文件链接指向已删除的旧版 Claude CLI；配置显示不可用。已验证链接生成，尚未实测完整 Claude 会话启动。没有代替用户发送提示、修改 Claude 状态或修补第三方安装。
 - 深色模式、降低透明度、增强对比度尚未逐项人工验收；使用原生 SwiftUI 材质和系统字体。
 - 自定义应用添加/移除、拖动排序、外置盘、Downloads、Desktop、Documents、iCloud/File Provider 范围尚未完整逐项验收。右键排序与本地项目范围已验证；不能据此宣称所有目录通用。
-- 冷启动主应用时，系统可能在后台创建设置窗口。请求设置 `activates = false`，成功后由目标应用获得焦点。沙盒调用者的 `NSWorkspace.OpenConfiguration.arguments` 会被系统忽略，因此实现不依赖启动参数抑制窗口。
+- Finder 正常请求保持 `activates = false`，设置窗口不参与 URL 路由；发生操作错误时仍会主动显示错误提示。实现不依赖沙盒调用者会被忽略的 `NSWorkspace.OpenConfiguration.arguments`。
 - 当前证书是 **Apple Development**。Release 归档可用于本地验证，但不是已公证的公开分发版本。
 - Developer ID、公证、GitHub Release、Homebrew tap 安装/升级/卸载仍待真实发布环境与仓库地址。脚本测试使用模拟外部工具，不代表 Apple 公证或 Homebrew 安装已经完成。

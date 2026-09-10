@@ -9,7 +9,7 @@ struct ActionExecutorTests {
         let first = try files.file("中文 + # & ' file.swift")
         let second = try files.file("second.swift")
         let workspace = RecordingWorkspace()
-        try await ActionExecutor(workspace: workspace).open(OpenTarget.builtIns[0], selection: selection([second, first]))
+        try await ActionExecutor(workspace: workspace).open(sampleTargets[0], selection: selection([second, first]))
         #expect(workspace.files == [.init(urls: [second, first], application: URL(fileURLWithPath: "/Applications/Test Editor.app"))])
         #expect(workspace.links.isEmpty)
     }
@@ -20,7 +20,7 @@ struct ActionExecutorTests {
         let second = try files.file("two")
         let folder = try files.directory("中文 + # & ' folder")
         let workspace = RecordingWorkspace()
-        try await ActionExecutor(workspace: workspace).open(OpenTarget.builtIns[3], selection: selection([first, second, folder]))
+        try await ActionExecutor(workspace: workspace).open(sampleTargets[3], selection: selection([first, second, folder]))
         #expect(workspace.files.count == 1)
         #expect(workspace.files.first?.urls == [files.root, folder])
         #expect(workspace.links.isEmpty)
@@ -30,7 +30,7 @@ struct ActionExecutorTests {
         let files = try TemporaryFiles()
         let folder = try files.directory("C++ + 中文")
         let workspace = RecordingWorkspace()
-        try await ActionExecutor(workspace: workspace).open(OpenTarget.builtIns[4], selection: selection([folder, folder]))
+        try await ActionExecutor(workspace: workspace).open(sampleTargets[4], selection: selection([folder, folder]))
         #expect(workspace.files.isEmpty)
         let call = try #require(workspace.links.first)
         #expect(workspace.links.count == 1)
@@ -44,10 +44,10 @@ struct ActionExecutorTests {
     @Test func invalidSelectionsAndUnavailableAppsNeverReachWorkspace() async throws {
         let workspace = RecordingWorkspace()
         let executor = ActionExecutor(workspace: workspace)
-        await #expect(throws: PlatformError.emptySelection) { try await executor.open(OpenTarget.builtIns[0], selection: selection([])) }
-        await #expect(throws: (any Error).self) { try await executor.open(OpenTarget.builtIns[0], selection: selection([URL(fileURLWithPath: "/oneclick-tests-missing/\(UUID())")])) }
+        await #expect(throws: PlatformError.emptySelection) { try await executor.open(sampleTargets[0], selection: selection([])) }
+        await #expect(throws: (any Error).self) { try await executor.open(sampleTargets[0], selection: selection([URL(fileURLWithPath: "/oneclick-tests-missing/\(UUID())")])) }
         workspace.application = nil
-        await #expect(throws: PlatformError.applicationUnavailable("Visual Studio Code")) { try await executor.open(OpenTarget.builtIns[0], selection: selection([URL(fileURLWithPath: "/tmp")])) }
+        await #expect(throws: PlatformError.applicationUnavailable("Visual Studio Code")) { try await executor.open(sampleTargets[0], selection: selection([URL(fileURLWithPath: "/tmp")])) }
         #expect(workspace.files.isEmpty)
         #expect(workspace.links.isEmpty)
     }
@@ -57,7 +57,7 @@ struct ActionExecutorTests {
         let url = try files.file("a")
         let workspace = RecordingWorkspace()
         workspace.failure = .unavailable
-        await #expect(throws: TestFailure.unavailable) { try await ActionExecutor(workspace: workspace).open(OpenTarget.builtIns[0], selection: selection([url])) }
+        await #expect(throws: TestFailure.unavailable) { try await ActionExecutor(workspace: workspace).open(sampleTargets[0], selection: selection([url])) }
     }
 
     @Test func copyingWritesExactPathsAndReportsClipboardFailure() throws {

@@ -12,8 +12,8 @@ let package = Package(
         .target(
             name: "OneClickCore",
             path: "src",
-            exclude: ["finder-extension", "app/OneClickApp.swift", "app/AppDelegate.swift", "app/views"],
-            sources: ["shared", "app/stores"]
+            exclude: ["finder-extension", "app/OneClickApp.swift", "app/views"],
+            sources: ["shared", "app/stores", "app/AppDelegate.swift"]
         ),
         .testTarget(
             name: "OneClickCoreTests",
