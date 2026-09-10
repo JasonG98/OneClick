@@ -1,0 +1,2 @@
+// Set DEVELOPMENT_TEAM in the ignored Local.xcconfig, or pass it to xcodebuild.
+#include? "Local.xcconfig"

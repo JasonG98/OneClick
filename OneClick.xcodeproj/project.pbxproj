@@ -1,0 +1,359 @@
+// !$*UTF8*$!
+{
+	"archiveVersion" = 1;
+	"classes" = {
+	};
+	"objectVersion" = 77;
+	"objects" = {
+		"0ACCF632C3826D33BA19BB5F" = {
+			"isa" = "PBXFileSystemSynchronizedRootGroup";
+			"path" = "Shared";
+			"sourceTree" = "<group>";
+		};
+		"A5660BF89DD2D657048780AB" = {
+			"isa" = "PBXFileSystemSynchronizedRootGroup";
+			"path" = "OneClick";
+			"sourceTree" = "<group>";
+		};
+		"39E53A5B4D47BF25EC27D946" = {
+			"isa" = "PBXFileSystemSynchronizedRootGroup";
+			"path" = "FinderExtension";
+			"sourceTree" = "<group>";
+		};
+		"DEF93E8F8AC229A0D98BBEFA" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.application";
+			"path" = "OneClick.app";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"214F4F86ED25E5775B44E3AB" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.app-extension";
+			"path" = "OneClickFinder.appex";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"4EDC8BFAFC6BD936B849F38C" = {
+			"isa" = "PBXGroup";
+			"children" = ("DEF93E8F8AC229A0D98BBEFA", "214F4F86ED25E5775B44E3AB");
+			"name" = "Products";
+			"sourceTree" = "<group>";
+		};
+		"3F60D54AF9989335D88A0458" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "text.xcconfig";
+			"path" = "Config/Signing.xcconfig";
+			"sourceTree" = "<group>";
+		};
+		"1E7EC68E24D28B488C4B3DFC" = {
+			"isa" = "PBXGroup";
+			"children" = ("A5660BF89DD2D657048780AB", "39E53A5B4D47BF25EC27D946", "0ACCF632C3826D33BA19BB5F", "3F60D54AF9989335D88A0458", "4EDC8BFAFC6BD936B849F38C");
+			"sourceTree" = "<group>";
+		};
+		"C74B99EB9C96B92153808335" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"D829D64B5D15C3B6594EC7AB" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"62AB3FF3E5F83790E84EC80C" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"DD552121ED5263B36102189A" = {
+			"isa" = "XCBuildConfiguration";
+			"name" = "Debug";
+			"buildSettings" = {
+				"ARCHS" = "arm64";
+				"ONLY_ACTIVE_ARCH" = "NO";
+				"SDKROOT" = "macosx";
+				"MACOSX_DEPLOYMENT_TARGET" = "26.0";
+				"SWIFT_VERSION" = "6.0";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"MARKETING_VERSION" = "0.1.0";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"ENABLE_HARDENED_RUNTIME" = "YES";
+				"CODE_SIGN_STYLE" = "Manual";
+				"CODE_SIGN_IDENTITY" = "Apple Development";
+				"CODE_SIGNING_ALLOWED" = "YES";
+				"ONECLICK_APP_GROUP" = "$(DEVELOPMENT_TEAM).local.oneclick.shared";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"COMBINE_HIDPI_IMAGES" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app.finder";
+				"INFOPLIST_FILE" = "Config/FinderExtension-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/FinderExtension.entitlements";
+				"APPLICATION_EXTENSION_API_ONLY" = "YES";
+				"SKIP_INSTALL" = "YES";
+				"ENABLE_APP_SANDBOX" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"DEBUG_INFORMATION_FORMAT" = "dwarf";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS" = "DEBUG";
+			};
+			"baseConfigurationReference" = "3F60D54AF9989335D88A0458";
+		};
+		"C1A8F56B6A256D53D4565266" = {
+			"isa" = "XCBuildConfiguration";
+			"name" = "Release";
+			"buildSettings" = {
+				"ARCHS" = "arm64";
+				"ONLY_ACTIVE_ARCH" = "NO";
+				"SDKROOT" = "macosx";
+				"MACOSX_DEPLOYMENT_TARGET" = "26.0";
+				"SWIFT_VERSION" = "6.0";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"MARKETING_VERSION" = "0.1.0";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"ENABLE_HARDENED_RUNTIME" = "YES";
+				"CODE_SIGN_STYLE" = "Manual";
+				"CODE_SIGN_IDENTITY" = "Apple Development";
+				"CODE_SIGNING_ALLOWED" = "YES";
+				"ONECLICK_APP_GROUP" = "$(DEVELOPMENT_TEAM).local.oneclick.shared";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"COMBINE_HIDPI_IMAGES" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app.finder";
+				"INFOPLIST_FILE" = "Config/FinderExtension-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/FinderExtension.entitlements";
+				"APPLICATION_EXTENSION_API_ONLY" = "YES";
+				"SKIP_INSTALL" = "YES";
+				"ENABLE_APP_SANDBOX" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"DEBUG_INFORMATION_FORMAT" = "dwarf-with-dsym";
+			};
+			"baseConfigurationReference" = "3F60D54AF9989335D88A0458";
+		};
+		"178F259C0007E72929FCA7FF" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("DD552121ED5263B36102189A", "C1A8F56B6A256D53D4565266");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"395AEB955E2ED7FC62945184" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "OneClickFinder";
+			"productName" = "OneClickFinder";
+			"productReference" = "214F4F86ED25E5775B44E3AB";
+			"productType" = "com.apple.product-type.app-extension";
+			"buildPhases" = ("C74B99EB9C96B92153808335", "D829D64B5D15C3B6594EC7AB", "62AB3FF3E5F83790E84EC80C");
+			"buildRules" = ();
+			"dependencies" = ();
+			"fileSystemSynchronizedGroups" = ("39E53A5B4D47BF25EC27D946", "0ACCF632C3826D33BA19BB5F");
+			"buildConfigurationList" = "178F259C0007E72929FCA7FF";
+		};
+		"6D1DE3AB287622A07B902120" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "985959785319747668373CC6";
+			"proxyType" = 1;
+			"remoteGlobalIDString" = "395AEB955E2ED7FC62945184";
+			"remoteInfo" = "OneClickFinder";
+		};
+		"5F2AABE8DFB1638A4A4E9731" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "395AEB955E2ED7FC62945184";
+			"targetProxy" = "6D1DE3AB287622A07B902120";
+		};
+		"6738F20AC6E5E14EF8D0EE90" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "214F4F86ED25E5775B44E3AB";
+			"settings" = {
+				"ATTRIBUTES" = ("RemoveHeadersOnCopy");
+			};
+		};
+		"7512561D2F685534F3A83998" = {
+			"isa" = "PBXCopyFilesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"dstPath" = "";
+			"dstSubfolderSpec" = 13;
+			"files" = ("6738F20AC6E5E14EF8D0EE90");
+			"name" = "Embed App Extensions";
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"09977F4923CFEBBF61FAB901" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"EA2C03D7973206E67818B526" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"5789B92D83DDCD820A78F810" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"6CCC433D89988F3E2859E1DB" = {
+			"isa" = "XCBuildConfiguration";
+			"name" = "Debug";
+			"buildSettings" = {
+				"ARCHS" = "arm64";
+				"ONLY_ACTIVE_ARCH" = "NO";
+				"SDKROOT" = "macosx";
+				"MACOSX_DEPLOYMENT_TARGET" = "26.0";
+				"SWIFT_VERSION" = "6.0";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"MARKETING_VERSION" = "0.1.0";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"ENABLE_HARDENED_RUNTIME" = "YES";
+				"CODE_SIGN_STYLE" = "Manual";
+				"CODE_SIGN_IDENTITY" = "Apple Development";
+				"CODE_SIGNING_ALLOWED" = "YES";
+				"ONECLICK_APP_GROUP" = "$(DEVELOPMENT_TEAM).local.oneclick.shared";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"COMBINE_HIDPI_IMAGES" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app";
+				"INFOPLIST_FILE" = "Config/OneClick-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/OneClick.entitlements";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"DEBUG_INFORMATION_FORMAT" = "dwarf";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS" = "DEBUG";
+			};
+			"baseConfigurationReference" = "3F60D54AF9989335D88A0458";
+		};
+		"60E450B27FD0D02DD5AA6B63" = {
+			"isa" = "XCBuildConfiguration";
+			"name" = "Release";
+			"buildSettings" = {
+				"ARCHS" = "arm64";
+				"ONLY_ACTIVE_ARCH" = "NO";
+				"SDKROOT" = "macosx";
+				"MACOSX_DEPLOYMENT_TARGET" = "26.0";
+				"SWIFT_VERSION" = "6.0";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"MARKETING_VERSION" = "0.1.0";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"ENABLE_HARDENED_RUNTIME" = "YES";
+				"CODE_SIGN_STYLE" = "Manual";
+				"CODE_SIGN_IDENTITY" = "Apple Development";
+				"CODE_SIGNING_ALLOWED" = "YES";
+				"ONECLICK_APP_GROUP" = "$(DEVELOPMENT_TEAM).local.oneclick.shared";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"COMBINE_HIDPI_IMAGES" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app";
+				"INFOPLIST_FILE" = "Config/OneClick-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/OneClick.entitlements";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"DEBUG_INFORMATION_FORMAT" = "dwarf-with-dsym";
+			};
+			"baseConfigurationReference" = "3F60D54AF9989335D88A0458";
+		};
+		"FC50051CCCB3E62BC1851582" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("6CCC433D89988F3E2859E1DB", "60E450B27FD0D02DD5AA6B63");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"0D04BFEB7D64B71C74FC925C" = {
+			"isa" = "PBXNativeTarget";
+			"name" = "OneClick";
+			"productName" = "OneClick";
+			"productReference" = "DEF93E8F8AC229A0D98BBEFA";
+			"productType" = "com.apple.product-type.application";
+			"buildPhases" = ("09977F4923CFEBBF61FAB901", "EA2C03D7973206E67818B526", "5789B92D83DDCD820A78F810", "7512561D2F685534F3A83998");
+			"buildRules" = ();
+			"dependencies" = ("5F2AABE8DFB1638A4A4E9731");
+			"fileSystemSynchronizedGroups" = ("A5660BF89DD2D657048780AB", "0ACCF632C3826D33BA19BB5F");
+			"buildConfigurationList" = "FC50051CCCB3E62BC1851582";
+		};
+		"433548979C024CC63B5F3B8D" = {
+			"isa" = "XCBuildConfiguration";
+			"name" = "Debug";
+			"buildSettings" = {
+				"ARCHS" = "arm64";
+				"ONLY_ACTIVE_ARCH" = "NO";
+				"SDKROOT" = "macosx";
+				"MACOSX_DEPLOYMENT_TARGET" = "26.0";
+				"SWIFT_VERSION" = "6.0";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"MARKETING_VERSION" = "0.1.0";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"ENABLE_HARDENED_RUNTIME" = "YES";
+				"CODE_SIGN_STYLE" = "Manual";
+				"CODE_SIGN_IDENTITY" = "Apple Development";
+				"CODE_SIGNING_ALLOWED" = "YES";
+				"ONECLICK_APP_GROUP" = "$(DEVELOPMENT_TEAM).local.oneclick.shared";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"COMBINE_HIDPI_IMAGES" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+				"DEBUG_INFORMATION_FORMAT" = "dwarf";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS" = "DEBUG";
+			};
+			"baseConfigurationReference" = "3F60D54AF9989335D88A0458";
+		};
+		"B800A40FDE6F0A0218D9BCD2" = {
+			"isa" = "XCBuildConfiguration";
+			"name" = "Release";
+			"buildSettings" = {
+				"ARCHS" = "arm64";
+				"ONLY_ACTIVE_ARCH" = "NO";
+				"SDKROOT" = "macosx";
+				"MACOSX_DEPLOYMENT_TARGET" = "26.0";
+				"SWIFT_VERSION" = "6.0";
+				"SWIFT_STRICT_CONCURRENCY" = "complete";
+				"CLANG_ENABLE_MODULES" = "YES";
+				"MARKETING_VERSION" = "0.1.0";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"ENABLE_HARDENED_RUNTIME" = "YES";
+				"CODE_SIGN_STYLE" = "Manual";
+				"CODE_SIGN_IDENTITY" = "Apple Development";
+				"CODE_SIGNING_ALLOWED" = "YES";
+				"ONECLICK_APP_GROUP" = "$(DEVELOPMENT_TEAM).local.oneclick.shared";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"COMBINE_HIDPI_IMAGES" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+				"DEBUG_INFORMATION_FORMAT" = "dwarf-with-dsym";
+			};
+			"baseConfigurationReference" = "3F60D54AF9989335D88A0458";
+		};
+		"3C05BEEE7303EE3FA7B250FA" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("433548979C024CC63B5F3B8D", "B800A40FDE6F0A0218D9BCD2");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"985959785319747668373CC6" = {
+			"isa" = "PBXProject";
+			"attributes" = {
+				"LastUpgradeCheck" = "2660";
+				"BuildIndependentTargetsInParallel" = "YES";
+			};
+			"buildConfigurationList" = "3C05BEEE7303EE3FA7B250FA";
+			"compatibilityVersion" = "Xcode 16.0";
+			"developmentRegion" = "zh-Hans";
+			"hasScannedForEncodings" = 0;
+			"knownRegions" = ("en", "zh-Hans", "Base");
+			"mainGroup" = "1E7EC68E24D28B488C4B3DFC";
+			"productRefGroup" = "4EDC8BFAFC6BD936B849F38C";
+			"projectDirPath" = "";
+			"projectRoot" = "";
+			"targets" = ("0D04BFEB7D64B71C74FC925C", "395AEB955E2ED7FC62945184");
+			"preferredProjectObjectVersion" = 77;
+		};
+	};
+	"rootObject" = "985959785319747668373CC6";
+}
