@@ -2,26 +2,92 @@ import Foundation
 import Testing
 @testable import OneClickCore
 
-@Test func loadingLegacyDefaultsRemovesOnlyPresetsAndPreservesUserChoices() throws {
+/// Upgrade path for a real install: a configuration written by an older version
+/// holds retired presets whose `kind` no longer exists. It has to load, keep the
+/// user's own applications and their switches, and drop only the presets.
+@Test func loadingLegacyPresetsRemovesThemAndPreservesUserChoices() throws {
     try withRepositoryFixture { root, fileURL in
-        let presets = [
-            OpenTarget(id: "vscode", name: "Visual Studio Code", kind: .application, bundleIdentifier: "com.microsoft.VSCode", isEnabled: false),
-            OpenTarget(id: "cursor", name: "Cursor", kind: .application, bundleIdentifier: "com.todesktop.230313mzl4w4u92", isEnabled: true),
-            OpenTarget(id: "sublime", name: "Sublime Text", kind: .application, bundleIdentifier: "com.sublimetext.4", isEnabled: true),
-            OpenTarget(id: "terminal", name: "Terminal", kind: .terminal, bundleIdentifier: "com.apple.Terminal", isEnabled: true),
-        ]
-        let imported = OpenTarget(id: "user-editor", name: "Visual Studio Code", kind: .application, bundleIdentifier: "com.microsoft.VSCode", applicationURL: root.appendingPathComponent("Code.app"), isEnabled: true)
-        var claude = try #require(OpenTarget.builtIns.first { $0.id == "claude" })
-        claude.isEnabled = false
-        let old = Settings(targets: [imported] + presets + [claude], copiesPaths: false, directories: [root])
-        try JSONEncoder().encode(old).write(to: fileURL)
+        let imported = root.appendingPathComponent("Code.app").absoluteString
+        let legacy = Data(#"""
+        {
+          "version": 1,
+          "targets": [
+            {"id":"user-editor","name":"Visual Studio Code","kind":"application","bundleIdentifier":"com.microsoft.VSCode","applicationURL":"\#(imported)","isEnabled":true},
+            {"id":"vscode","name":"Visual Studio Code","kind":"application","bundleIdentifier":"com.microsoft.VSCode","isEnabled":false},
+            {"id":"sublime","name":"Sublime Text","kind":"application","bundleIdentifier":"com.sublimetext.4","isEnabled":true},
+            {"id":"terminal","name":"Terminal","kind":"terminal","bundleIdentifier":"com.apple.Terminal","isEnabled":false},
+            {"id":"claude","name":"Claude Code","kind":"claude","bundleIdentifier":"com.anthropic.claude-code-url-handler","isEnabled":true}
+          ],
+          "copiesPaths": false,
+          "directories": ["\#(root.absoluteString)"]
+        }
+        """#.utf8)
+        try legacy.write(to: fileURL)
+
         let repository = SettingsRepository(fileURL: fileURL)
         let loaded = try repository.load()
-        #expect(loaded.targets == [imported, claude])
-        #expect(!loaded.copiesPaths)
+
+        // Imported application and the Terminal preset survive; the retired
+        // vscode/sublime/claude presets do not. Terminal keeps its off switch.
+        #expect(loaded.targets.map(\.id) == ["user-editor", "terminal"])
+        #expect(loaded.targets[0].isEnabled)
+        #expect(!loaded.targets[1].isEnabled)
         #expect(loaded.directories == [root])
+
         try repository.save(loaded)
         #expect(try repository.load() == loaded)
+    }
+}
+
+/// A configuration that held nothing but retired presets would otherwise come
+/// back empty; it falls back to the current built-ins instead.
+@Test func configurationHoldingOnlyRetiredPresetsFallsBackToBuiltIns() throws {
+    try withRepositoryFixture { _, fileURL in
+        let legacy = Data(#"""
+        {"version":1,"targets":[{"id":"claude","name":"Claude Code","kind":"claude","bundleIdentifier":"com.anthropic.claude-code-url-handler","isEnabled":true}],"directories":[]}
+        """#.utf8)
+        try legacy.write(to: fileURL)
+
+        #expect(try SettingsRepository(fileURL: fileURL).load().targets == OpenTarget.builtIns)
+    }
+}
+
+/// A configuration that predates the current built-ins gets them back while it
+/// is being rewritten — the case for an install that had an imported editor
+/// alongside the retired Claude preset.
+@Test func migratingARetiredPresetAlsoRestoresAMissingBuiltIn() throws {
+    try withRepositoryFixture { root, fileURL in
+        let imported = root.appendingPathComponent("Code.app").absoluteString
+        let legacy = Data(#"""
+        {"version":1,"targets":[
+          {"id":"user-editor","name":"Visual Studio Code","kind":"application","bundleIdentifier":"com.microsoft.VSCode","applicationURL":"\#(imported)","isEnabled":true},
+          {"id":"claude","name":"Claude Code","kind":"claude","bundleIdentifier":"com.anthropic.claude-code-url-handler","isEnabled":true}
+        ],"directories":[]}
+        """#.utf8)
+        try legacy.write(to: fileURL)
+
+        #expect(try SettingsRepository(fileURL: fileURL).load().targets.map(\.id) == ["user-editor", "terminal"])
+    }
+}
+
+/// A configuration with no retired presets is left exactly as the user left it
+/// — nothing is added behind their back.
+@Test func configurationWithoutRetiredPresetsIsNotModified() throws {
+    try withRepositoryFixture { root, fileURL in
+        let repository = SettingsRepository(fileURL: fileURL)
+        let curated = Settings(targets: [
+            OpenTarget(
+                id: "user-editor",
+                name: "Visual Studio Code",
+                kind: .application,
+                bundleIdentifier: "com.microsoft.VSCode",
+                applicationURL: root.appendingPathComponent("Code.app"),
+                isEnabled: true
+            ),
+        ])
+        try repository.save(curated)
+
+        #expect(try repository.load() == curated)
     }
 }
 
@@ -51,7 +117,6 @@ import Testing
         let expected = Settings(
             version: 1,
             targets: targets,
-            copiesPaths: false,
             directories: [directory]
         )
 
@@ -117,14 +182,14 @@ import Testing
     }
 }
 
-@Test func repositoryRejectsAnEmptyTargetList() throws {
+/// Clearing every target is a legitimate choice — the user may want only the
+/// copy-path action — so an empty list must save and must stay empty on reload.
+@Test func repositoryAcceptsAndKeepsAnEmptyTargetList() throws {
     try withRepositoryFixture { _, fileURL in
-        let settings = Settings(targets: [])
+        let repository = SettingsRepository(fileURL: fileURL)
+        try repository.save(Settings(targets: []))
 
-        #expect(throws: (any Error).self) {
-            try SettingsRepository(fileURL: fileURL).save(settings)
-        }
-        #expect(!FileManager.default.fileExists(atPath: fileURL.path))
+        #expect(try repository.load().targets.isEmpty)
     }
 }
 

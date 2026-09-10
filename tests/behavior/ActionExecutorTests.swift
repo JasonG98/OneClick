@@ -11,7 +11,6 @@ struct ActionExecutorTests {
         let workspace = RecordingWorkspace()
         try await ActionExecutor(workspace: workspace).open(sampleTargets[0], selection: selection([second, first]))
         #expect(workspace.files == [.init(urls: [second, first], application: URL(fileURLWithPath: "/Applications/Test Editor.app"))])
-        #expect(workspace.links.isEmpty)
     }
 
     @Test func terminalOpensDistinctParentDirectories() async throws {
@@ -23,22 +22,6 @@ struct ActionExecutorTests {
         try await ActionExecutor(workspace: workspace).open(sampleTargets[3], selection: selection([first, second, folder]))
         #expect(workspace.files.count == 1)
         #expect(workspace.files.first?.urls == [files.root, folder])
-        #expect(workspace.links.isEmpty)
-    }
-
-    @Test func claudeUsesOneDeepLinkPerDirectoryWithoutOpeningFiles() async throws {
-        let files = try TemporaryFiles()
-        let folder = try files.directory("C++ + 中文")
-        let workspace = RecordingWorkspace()
-        try await ActionExecutor(workspace: workspace).open(sampleTargets[4], selection: selection([folder, folder]))
-        #expect(workspace.files.isEmpty)
-        let call = try #require(workspace.links.first)
-        #expect(workspace.links.count == 1)
-        #expect(call.activates)
-        #expect(call.url.scheme == "claude-cli")
-        #expect(call.url.host == "open")
-        #expect(!call.url.absoluteString.contains("+"))
-        #expect(URLComponents(url: call.url, resolvingAgainstBaseURL: false)?.queryItems == [URLQueryItem(name: "cwd", value: folder.path)])
     }
 
     @Test func invalidSelectionsAndUnavailableAppsNeverReachWorkspace() async throws {
@@ -49,7 +32,6 @@ struct ActionExecutorTests {
         workspace.application = nil
         await #expect(throws: PlatformError.applicationUnavailable("Visual Studio Code")) { try await executor.open(sampleTargets[0], selection: selection([URL(fileURLWithPath: "/tmp")])) }
         #expect(workspace.files.isEmpty)
-        #expect(workspace.links.isEmpty)
     }
 
     @Test func workspaceFailurePropagatesToCaller() async throws {

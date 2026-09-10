@@ -16,6 +16,8 @@ struct ActionExecutor {
         self.writeClipboard = writeClipboard
     }
 
+    /// Runs inside the Finder extension: every target is opened here, with no
+    /// hand-off to the container app.
     func open(_ target: OpenTarget, selection: SelectionContext) async throws {
         guard !selection.urls.isEmpty else { throw PlatformError.emptySelection }
         guard let application = workspace.applicationURL(for: target) else {
@@ -31,11 +33,6 @@ struct ActionExecutor {
         case .terminal:
             let directories = try selection.workingDirectories()
             try await workspace.open(directories, withApplicationAt: application)
-        case .claude:
-            let links = try selection.workingDirectories().map { try ClaudeLink.make(directory: $0) }
-            for link in links {
-                try await workspace.open(link, activates: true)
-            }
         }
         logger.info("Opened target \(target.id, privacy: .public), selection count \(selection.urls.count)")
     }
@@ -48,6 +45,8 @@ struct ActionExecutor {
         logger.info("Copied \(selection.urls.count) paths")
     }
 
+    /// Surfaces a failure in the settings window. The extension has no UI of its
+    /// own, so the container app is brought up to show it.
     func presentFailure(_ error: Error) {
         logger.error("Action failed: \(error.localizedDescription, privacy: .public)")
         SharedEnvironment.report(error)

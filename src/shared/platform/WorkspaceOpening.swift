@@ -1,12 +1,12 @@
 import AppKit
 
 /// Only the operating-system boundary is replaceable; routing and validation
-/// remain in ActionExecutor and the request handlers.
+/// remain in ActionExecutor.
 @MainActor
 protocol WorkspaceOpening {
     func applicationURL(for target: OpenTarget) -> URL?
     func open(_ urls: [URL], withApplicationAt application: URL) async throws
-    func open(_ url: URL, activates: Bool) async throws
+    func openApplication(_ application: URL) async throws
 }
 
 @MainActor
@@ -21,9 +21,9 @@ struct SystemWorkspace: WorkspaceOpening {
         _ = try await NSWorkspace.shared.open(urls, withApplicationAt: application, configuration: configuration)
     }
 
-    func open(_ url: URL, activates: Bool) async throws {
+    func openApplication(_ application: URL) async throws {
         let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = activates
-        _ = try await NSWorkspace.shared.open(url, configuration: configuration)
+        configuration.activates = true
+        try await NSWorkspace.shared.openApplication(at: application, configuration: configuration)
     }
 }

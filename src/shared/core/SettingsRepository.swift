@@ -25,27 +25,49 @@ struct SettingsRepository: Sendable {
             throw OneClickCoreError.cannotReadSettings
         }
 
-        var settings: Settings
+        let decoded: Settings
         do {
-            settings = try JSONDecoder().decode(Settings.self, from: data)
+            decoded = try JSONDecoder().decode(Settings.self, from: data)
         } catch {
             throw OneClickCoreError.malformedSettings
         }
 
+        let settings = migrated(decoded)
         try validate(settings)
-        // Remove retired presets without removing applications imported by the user.
+        return settings
+    }
+
+    /// Drops presets that earlier versions shipped and this one no longer
+    /// supports. Applications imported by the user carry an `applicationURL` and
+    /// are never touched. Migration runs before validation so a configuration
+    /// holding nothing but retired presets still loads.
+    private func migrated(_ settings: Settings) -> Settings {
+        var settings = settings
         let retiredPresets: [String: String] = [
             "vscode": "com.microsoft.VSCode",
             "cursor": "com.todesktop.230313mzl4w4u92",
             "sublime": "com.sublimetext.4",
-            "terminal": "com.apple.Terminal",
+            "claude": "com.anthropic.claude-code-url-handler",
         ]
+        let countBefore = settings.targets.count
         settings.targets.removeAll { target in
             target.applicationURL == nil
                 && retiredPresets[target.id].map { $0 == target.bundleIdentifier } == true
         }
-        if settings.targets.isEmpty {
+        // Only touch the list when something actually had to be removed. A
+        // configuration the user curated must not gain targets behind their
+        // back, and a list they deliberately emptied has to stay empty.
+        guard settings.targets.count != countBefore else { return settings }
+
+        guard !settings.targets.isEmpty else {
             settings.targets = OpenTarget.builtIns
+            return settings
+        }
+        // The rewrite above means this configuration predates the current
+        // built-ins, so make sure they are represented. Terminal used to be a
+        // removable preset and is a built-in now.
+        for builtIn in OpenTarget.builtIns where !settings.targets.contains(where: { $0.id == builtIn.id }) {
+            settings.targets.append(builtIn)
         }
         return settings
     }
@@ -77,9 +99,8 @@ struct SettingsRepository: Sendable {
         guard settings.version == 1 else {
             throw OneClickCoreError.unsupportedSettingsVersion(settings.version)
         }
-        guard !settings.targets.isEmpty else {
-            throw OneClickCoreError.invalidSettings("至少需要保留一个打开目标。")
-        }
+        // An empty target list is a legitimate choice — the user may want only
+        // the copy-path action — so it is no longer treated as invalid.
 
         var targetIDs = Set<String>()
         for target in settings.targets {
@@ -111,11 +132,6 @@ struct SettingsRepository: Sendable {
                 guard bundleIdentifier == "com.apple.Terminal",
                       target.applicationURL == nil else {
                     throw OneClickCoreError.invalidSettings("Terminal 目标必须使用系统终端。")
-                }
-            case .claude:
-                guard bundleIdentifier == "com.anthropic.claude-code-url-handler",
-                      target.applicationURL == nil else {
-                    throw OneClickCoreError.invalidSettings("Claude Code 目标必须使用官方链接处理程序。")
                 }
             }
         }

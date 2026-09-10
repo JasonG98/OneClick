@@ -25,12 +25,22 @@ elif [[ "$ONECLICK_MODE" != "--build-only" ]]; then
   exit 2
 fi
 if [[ "$ONECLICK_MODE" != "--build-only" ]]; then
-  # Only terminate an instance whose executable is our development build.
+  # Only terminate instances whose executable is this development build. An
+  # extension started from another copy (Xcode's own DerivedData, for example)
+  # is left alone: that copy is not the one this script manages.
+  ONECLICK_APPEX="$ONECLICK_APP/Contents/PlugIns/OneClickFinder.appex"
+  ONECLICK_EXTENSION_BINARY="$ONECLICK_APPEX/Contents/MacOS/OneClickFinder"
   for ONECLICK_PID in $(pgrep -x OneClick || true); do
     ONECLICK_COMMAND="$(ps -p "$ONECLICK_PID" -o comm=)"
     if [[ "$ONECLICK_COMMAND" == "$ONECLICK_APP/Contents/MacOS/OneClick" ]]; then
       kill "$ONECLICK_PID"
     fi
+  done
+  # Finder keeps the extension resident until its bundle is replaced under it,
+  # at which point the process exits. It is never started again on its own, so
+  # retire it here and let the recovery step below start the fresh one.
+  for ONECLICK_PID in $(pgrep -f "$ONECLICK_EXTENSION_BINARY" || true); do
+    kill "$ONECLICK_PID"
   done
 fi
 mkdir -p "$ONECLICK_ROOT/.build/logs"
@@ -45,7 +55,63 @@ if [[ -n "$ONECLICK_TEAM" ]]; then
 fi
 echo "Built $ONECLICK_APP"
 if [[ "$ONECLICK_MODE" == "--build-only" ]]; then exit 0; fi
+
 /usr/bin/open -n "$ONECLICK_APP"
+
+# Finder starts a Finder Sync extension once and never starts it again when that
+# process exits. A rebuild replaces the .appex underneath the running process, so
+# the extension dies and stays dead while System Settings still shows it as
+# enabled: no context menu and no toolbar button, with nothing to re-enable.
+#
+# PluginKit keeps whichever copy of the bundle registered first and ignores a
+# later `pluginkit -a` for the same identifier, so a stale copy (Xcode's own
+# DerivedData) keeps winning and this build's extension never loads. Retiring
+# the stale registration and re-registering this build is what repoints it, and
+# re-electing the plugin restarts the extension without touching Finder or the
+# user's other extensions.
+ONECLICK_EXTENSION_ID="local.oneclick.app.finder"
+ONECLICK_LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister
+
+oneclick_registered_appex_path() {
+  /usr/bin/pluginkit -m -v -i "$ONECLICK_EXTENSION_ID" 2>/dev/null |
+    awk '{ path = $NF } path ~ /\.appex$/ { print path; exit }'
+}
+
+oneclick_retire_stale_registration() {
+  local ONECLICK_REGISTERED ONECLICK_STALE_APP
+  ONECLICK_REGISTERED="$(oneclick_registered_appex_path)"
+  [[ -n "$ONECLICK_REGISTERED" ]] || return 0
+  [[ "$ONECLICK_REGISTERED" == "$ONECLICK_APPEX" ]] && return 0
+  # Keep the app bundle that owns the stale extension, never the appex alone:
+  # a stale appex outlives the registration of its container otherwise.
+  ONECLICK_STALE_APP="${ONECLICK_REGISTERED%%.appex*}"
+  ONECLICK_STALE_APP="${ONECLICK_STALE_APP%/Contents/PlugIns}"
+  if [[ "$ONECLICK_STALE_APP" == *.app ]]; then
+    echo "Retiring stale extension registration: $ONECLICK_STALE_APP"
+    "$ONECLICK_LSREGISTER" -u "$ONECLICK_STALE_APP" > /dev/null 2>&1 || true
+  fi
+}
+
+oneclick_reload_extension() {
+  if [[ ! -d "$ONECLICK_APPEX" ]]; then
+    echo "Extension bundle missing from the build product: $ONECLICK_APPEX" >&2
+    return 0
+  fi
+  oneclick_retire_stale_registration
+  "$ONECLICK_LSREGISTER" -f "$ONECLICK_APP" > /dev/null 2>&1 || true
+  /usr/bin/pluginkit -a "$ONECLICK_APPEX" > /dev/null 2>&1 || true
+  /usr/bin/pluginkit -e use -i "$ONECLICK_EXTENSION_ID" > /dev/null 2>&1 || true
+  for _ in {1..40}; do
+    if pgrep -f "$ONECLICK_EXTENSION_BINARY" > /dev/null 2>&1; then
+      echo "Finder extension is running"
+      return 0
+    fi
+    sleep 0.25
+  done
+  echo "Finder extension did not restart. Open the OneClick settings window and use the status card, or restart Finder." >&2
+}
+oneclick_reload_extension
+
 case "$ONECLICK_MODE" in
   --verify)
     for ONECLICK_ATTEMPT in {1..20}; do

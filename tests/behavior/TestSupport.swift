@@ -34,7 +34,6 @@ final class TemporaryFiles {
     }
 
     var settings: SettingsRepository { SettingsRepository(fileURL: root.appendingPathComponent("settings.json")) }
-    var requests: OpenRequestRepository { OpenRequestRepository(directory: root) }
 }
 
 enum TestFailure: Error, Equatable { case unavailable }
@@ -45,14 +44,9 @@ final class RecordingWorkspace: WorkspaceOpening {
         let urls: [URL]
         let application: URL
     }
-    struct LinkOpen: Equatable {
-        let url: URL
-        let activates: Bool
-    }
     var application: URL? = URL(fileURLWithPath: "/Applications/Test Editor.app")
     var failure: TestFailure?
     var files: [FileOpen] = []
-    var links: [LinkOpen] = []
 
     func applicationURL(for target: OpenTarget) -> URL? { application }
 
@@ -61,10 +55,7 @@ final class RecordingWorkspace: WorkspaceOpening {
         files.append(FileOpen(urls: urls, application: application))
     }
 
-    func open(_ url: URL, activates: Bool) async throws {
-        if let failure { throw failure }
-        links.append(LinkOpen(url: url, activates: activates))
-    }
+    func openApplication(_ application: URL) async throws {}
 }
 
 @MainActor
@@ -72,6 +63,11 @@ final class SettingsHarness {
     let files: TemporaryFiles
     var availableIDs: Set<String> = ["test-terminal", "test-vscode"]
     var extensionEnabled = false
+    /// What the extension last wrote about itself, if anything.
+    var extensionHeartbeat: ExtensionHeartbeat?
+    var extensionRunning = false
+    var reloadSucceeds = true
+    var reloadCount = 0
     var notifications = 0
 
     init() throws { files = try TemporaryFiles() }
@@ -82,6 +78,18 @@ final class SettingsHarness {
             homeDirectory: files.root,
             applicationURL: { self.availableIDs.contains($0.id) ? URL(fileURLWithPath: "/Applications/Test.app") : nil },
             extensionEnabled: { self.extensionEnabled },
+            extensionAvailability: {
+                ExtensionAvailabilityEvaluator(
+                    isEnabled: self.extensionEnabled,
+                    heartbeat: self.extensionHeartbeat,
+                    isRunning: { _ in self.extensionRunning },
+                    now: { Date() }
+                ).evaluate()
+            },
+            reloadExtension: {
+                self.reloadCount += 1
+                return self.reloadSucceeds
+            },
             settingsChanged: { self.notifications += 1 },
             takeError: { nil },
             presentError: {}
@@ -93,7 +101,8 @@ func selection(_ urls: [URL]) -> SelectionContext {
     SelectionContext(selected: urls, targeted: nil, isContainer: false)
 }
 
-// Explicit multi-application fixtures, independent of the default settings.
+// Explicit fixtures, independent of what ships built in, so tests control
+// availability, ordering and count without depending on the defaults.
 let sampleTargets: [OpenTarget] = [
         OpenTarget(
             id: "test-vscode",
@@ -127,4 +136,12 @@ let sampleTargets: [OpenTarget] = [
             applicationURL: nil,
             isEnabled: true
         ),
-] + OpenTarget.builtIns
+        OpenTarget(
+            id: "test-nova",
+            name: "Nova",
+            kind: .application,
+            bundleIdentifier: "com.panic.Nova",
+            applicationURL: nil,
+            isEnabled: true
+        ),
+]

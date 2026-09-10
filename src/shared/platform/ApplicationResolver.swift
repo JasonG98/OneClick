@@ -3,10 +3,6 @@ import AppKit
 @MainActor
 struct ApplicationResolver {
     func applicationURL(for target: OpenTarget) -> URL? {
-        if target.kind == .claude {
-            guard let url = URL(string: "claude-cli://open") else { return nil }
-            return executableApplication(NSWorkspace.shared.urlForApplication(toOpen: url))
-        }
         if let url = target.applicationURL,
            FileManager.default.fileExists(atPath: url.path),
            Bundle(url: url)?.bundleIdentifier == target.bundleIdentifier {

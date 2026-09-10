@@ -9,12 +9,10 @@ struct SettingsModelTests {
         let model = harness.model()
         #expect(model.configurationAvailable)
         #expect(try harness.files.settings.load().directories == [harness.files.root])
-        model.setEnabled("claude", false)
-        model.settings.copiesPaths = false
+        model.setEnabled("terminal", false)
         model.save()
         let reloaded = harness.model()
-        #expect(reloaded.settings.targets.first { $0.id == "claude" }?.isEnabled == false)
-        #expect(!reloaded.settings.copiesPaths)
+        #expect(reloaded.settings.targets.first { $0.id == "terminal" }?.isEnabled == false)
         #expect(harness.notifications == 2)
     }
 
@@ -23,9 +21,9 @@ struct SettingsModelTests {
         try harness.files.settings.save(Settings(targets: sampleTargets))
         let model = harness.model()
         model.move("test-terminal", by: -1)
-        #expect(try harness.files.settings.load().targets.map(\.id) == ["test-vscode", "test-cursor", "test-terminal", "test-sublime", "claude"])
+        #expect(try harness.files.settings.load().targets.map(\.id) == ["test-vscode", "test-cursor", "test-terminal", "test-sublime", "test-nova"])
         model.move(from: IndexSet([0, 2]), to: 5)
-        #expect(try harness.files.settings.load().targets.map(\.id) == ["test-cursor", "test-sublime", "claude", "test-vscode", "test-terminal"])
+        #expect(try harness.files.settings.load().targets.map(\.id) == ["test-cursor", "test-sublime", "test-nova", "test-vscode", "test-terminal"])
         model.move("test-cursor", by: -1)
         model.move("unknown", by: 1)
         #expect(harness.notifications == 2)
@@ -43,7 +41,7 @@ struct SettingsModelTests {
         #expect(added.applicationURL == app)
         #expect(model.settings.targets.count == 2)
         model.remove(added.id)
-        #expect(try harness.files.settings.load().targets.map(\.id) == ["claude"])
+        #expect(try harness.files.settings.load().targets.map(\.id) == ["terminal"])
     }
 
     @Test func directoryChangesDeduplicateAndPersist() throws {
@@ -53,6 +51,33 @@ struct SettingsModelTests {
         model.addDirectories([directory, directory, harness.files.root])
         #expect(try harness.files.settings.load().directories == [harness.files.root, directory])
         model.removeDirectory(directory)
+        #expect(try harness.files.settings.load().directories == [harness.files.root])
+    }
+
+    /// Removing every directory leaves the extension observing nothing, so the
+    /// context menu disappears everywhere. Restoring the shipped default is the
+    /// way back, and it has to persist like any other edit.
+    @Test func restoringTheDefaultDirectoryBringsBackTheHomeDirectory() throws {
+        let harness = try SettingsHarness()
+        try harness.files.settings.save(Settings(directories: []))
+        let model = harness.model()
+        #expect(model.settings.directories.isEmpty)
+        #expect(!model.isDefaultDirectoryConfigured)
+
+        model.restoreDefaultDirectory()
+
+        #expect(try harness.files.settings.load().directories == [harness.files.root])
+        #expect(model.isDefaultDirectoryConfigured)
+        #expect(harness.notifications == 1)
+    }
+
+    @Test func restoringTheDefaultDirectoryDoesNotDuplicateIt() throws {
+        let harness = try SettingsHarness()
+        let model = harness.model()
+        #expect(model.isDefaultDirectoryConfigured)
+
+        model.restoreDefaultDirectory()
+
         #expect(try harness.files.settings.load().directories == [harness.files.root])
     }
 
@@ -80,7 +105,7 @@ struct SettingsModelTests {
         let model = harness.model()
         #expect(!model.configurationAvailable)
         #expect(model.errorMessage != nil)
-        model.setEnabled("claude", false)
+        model.setEnabled("terminal", false)
         #expect(try Data(contentsOf: url) == invalid)
         #expect(harness.notifications == 0)
     }
@@ -91,7 +116,7 @@ struct SettingsModelTests {
         let url = harness.files.root.appendingPathComponent("settings.json")
         try FileManager.default.removeItem(at: url)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        model.setEnabled("claude", false)
+        model.setEnabled("terminal", false)
         #expect(model.errorMessage != nil)
         #expect(harness.notifications == 0)
     }

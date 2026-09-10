@@ -6,22 +6,27 @@ struct OneClickApp: App {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
-        // Install the action at app scope: a suppressed scene has no view
-        // lifecycle on which to observe a settings-presentation request.
-        let _ = delegate.showSettings = {
-            openWindow(id: "settings")
-            NSApp.activate()
+        // The presenter is installed at app scope: the reopen path needs it, and
+        // it always arrives after the scene is built.
+        //
+        // The window is opened on the next main-actor turn rather than inline:
+        // this closure also runs while the scene graph is still being built, and
+        // asking for a window from inside that pass is not reliable.
+        let _ = delegate.installSettingsPresenter {
+            Task { @MainActor in
+                openWindow(id: "settings")
+                NSApp.activate()
+            }
         }
         Window("OneClick", id: "settings") {
+            // The window keeps the system background instead of a window-wide
+            // material: a translucent sheet behind every pane flattened the
+            // sidebar, the list and the toolbar into one grey slab.
             SettingsView(model: delegate.model)
-                .handlesExternalEvents(preferring: [], allowing: [])
         }
-        .defaultSize(width: 650, height: 760)
+        .defaultSize(width: 720, height: 440)
         .windowResizability(.contentMinSize)
-        .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
-        // Finder URLs are consumed by AppDelegate, never by the settings scene.
-        .handlesExternalEvents(matching: [])
         .commands {
             CommandGroup(replacing: .newItem) {}
             SettingsCommands()

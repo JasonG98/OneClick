@@ -11,19 +11,21 @@ struct FinderMenuTests {
         let builder = FinderMenuBuilder(available: { _ in true }, icon: { _ in nil })
         let files = try TemporaryFiles()
         let chosen = selection([try files.directory("folder")])
-        let menu = try #require(builder.makeMenu(settings: Settings(targets: targets, copiesPaths: false), selection: chosen, actions: &registry))
-        let direct = Array(menu.items.prefix(3))
-        #expect(direct.map(\.title) == targets.prefix(3).map { "在 \($0.name) 中打开" })
+        let menu = try #require(builder.makeMenu(settings: Settings(targets: targets), selection: chosen, actions: &registry))
+        #expect(menu.items.last?.title == "复制绝对路径")
+        let openMenuItems = Array(menu.items.dropLast())
+        let direct = Array(openMenuItems.prefix(3))
+        #expect(direct.map(\.title) == targets.prefix(3).map { "用 \($0.name) 打开" })
         #expect(direct.allSatisfy { $0.submenu == nil })
         var openItems = direct
         if count > 3 {
-            #expect(menu.items.count == 4)
-            #expect(menu.items[3].title == "在应用中打开")
-            let submenu = try #require(menu.items[3].submenu)
+            #expect(openMenuItems.count == 4)
+            #expect(openMenuItems[3].title == "用其他应用打开")
+            let submenu = try #require(openMenuItems[3].submenu)
             #expect(submenu.items.map(\.title) == targets.dropFirst(3).map(\.name))
             openItems += submenu.items
         } else {
-            #expect(menu.items.count == 3)
+            #expect(openMenuItems.count == 3)
         }
         #expect(openItems.compactMap { registry.action(for: $0.tag)?.target?.id } == targets.map(\.id))
         #expect(openItems.allSatisfy { registry.action(for: $0.tag)?.selection.urls == chosen.urls })
@@ -32,14 +34,14 @@ struct FinderMenuTests {
     @Test func menuFiltersTargetsPreservesOrderAndSnapshotsSelection() throws {
         var settings = Settings(targets: sampleTargets)
         settings.targets.reverse()
-        settings.targets[0].isEnabled = false // Claude is installed but disabled.
+        settings.targets[0].isEnabled = false // Nova is installed but disabled.
         var registry = MenuActionRegistry()
-        let builder = FinderMenuBuilder(available: { ["claude", "test-terminal", "test-vscode"].contains($0.id) }, icon: { _ in nil })
+        let builder = FinderMenuBuilder(available: { ["test-terminal", "test-vscode"].contains($0.id) }, icon: { _ in nil })
         let files = try TemporaryFiles()
         let chosen = selection([try files.directory("中文 + ' a"), try files.directory("b")])
         let menu = try #require(builder.makeMenu(settings: settings, selection: chosen, actions: &registry))
         let openItems = Array(menu.items.dropLast())
-        #expect(openItems.map(\.title) == ["在 Terminal 中打开", "在 Visual Studio Code 中打开"])
+        #expect(openItems.map(\.title) == ["用 Terminal 打开", "用 Visual Studio Code 打开"])
         #expect(openItems.allSatisfy { $0.submenu == nil && $0.tag > 0 })
         #expect(Set(openItems.map(\.tag)).count == 2)
         let action = try #require(registry.action(for: openItems[0].tag))
@@ -65,7 +67,6 @@ struct FinderMenuTests {
         #expect(copy.title == (mixed ? "复制 2 个绝对路径" : "复制绝对路径"))
         #expect(registry.action(for: copy.tag)?.selection.pathText == chosen.pathText)
         #expect(registry.action(for: copy.tag)?.target == nil)
-        #expect(builder.makeMenu(settings: Settings(targets: sampleTargets, copiesPaths: false), selection: chosen, actions: &registry) == nil)
     }
 
     @Test func backgroundDirectoryShowsApplicationItems() throws {
@@ -73,16 +74,17 @@ struct FinderMenuTests {
         let background = SelectionContext(selected: [try files.file("stale.txt")], targeted: files.root, isContainer: true)
         var registry = MenuActionRegistry()
         let builder = FinderMenuBuilder(available: { _ in true }, icon: { _ in nil })
-        let menu = try #require(builder.makeMenu(settings: Settings(copiesPaths: false), selection: background, actions: &registry))
-        #expect(menu.items.map(\.title) == ["在 Claude Code 中打开"])
+        let menu = try #require(builder.makeMenu(settings: Settings(), selection: background, actions: &registry))
+        #expect(menu.items.map(\.title) == ["用 Terminal 打开", "复制绝对路径"])
         #expect(registry.action(for: menu.items[0].tag)?.selection.urls == [files.root])
     }
 
-    @Test func emptySelectionAndDisabledActionsProduceNoMenu() {
+    @Test func emptySelectionProducesNoMenuAndDisabledApplicationsFallBackToCopy() {
         var registry = MenuActionRegistry()
         let builder = FinderMenuBuilder(available: { _ in false }, icon: { _ in nil })
         #expect(builder.makeMenu(settings: Settings(targets: sampleTargets), selection: selection([]), actions: &registry) == nil)
-        #expect(builder.makeMenu(settings: Settings(copiesPaths: false), selection: selection([URL(fileURLWithPath: "/tmp/a")]), actions: &registry) == nil)
+        let menu = builder.makeMenu(settings: Settings(targets: sampleTargets), selection: selection([URL(fileURLWithPath: "/tmp/a")]), actions: &registry)
+        #expect(menu?.items.map(\.title) == ["复制绝对路径"])
     }
 
     @Test func copyOnlyMenuUsesBackgroundDirectoryAndSingleItemTitle() throws {
@@ -93,5 +95,81 @@ struct FinderMenuTests {
         #expect(menu.items.count == 1)
         #expect(menu.items[0].title == "复制绝对路径")
         #expect(registry.action(for: menu.items[0].tag)?.selection.pathText == "/tmp/current")
+    }
+
+    /// App icons and SF Symbols must land in the same box.
+    ///
+    /// They used to arrive at 16x16 and 16x18 respectively, because only the app
+    /// icons were resized, which made the icon column change height between rows.
+    @Test func everyMenuItemImageSharesTheSameBox() throws {
+        var registry = MenuActionRegistry()
+        let largeIcon = NSImage(size: NSSize(width: 512, height: 512))
+        let builder = FinderMenuBuilder(available: { _ in true }, icon: { _ in largeIcon })
+        let files = try TemporaryFiles()
+        let chosen = selection([try files.directory("folder")])
+        var built = builder.makeMenu(settings: Settings(targets: sampleTargets), selection: chosen, actions: &registry)
+        builder.addingSettingsItem(to: &built, handler: nil, action: nil)
+        let menu = try #require(built)
+
+        // Include the folded submenu: those rows sit in the same column.
+        var items = menu.items
+        for item in menu.items {
+            if let submenu = item.submenu { items += submenu.items }
+        }
+        let sizes = items.filter { !$0.isSeparatorItem }.compactMap(\.image?.size)
+
+        #expect(sizes.count == items.filter { !$0.isSeparatorItem }.count)
+        #expect(sizes.allSatisfy { $0 == NSSize(width: 16, height: 16) })
+    }
+
+    /// The Finder toolbar button is the app's only persistent entry point, so
+    /// settings must be reachable even when there is no selection to act on.
+    @Test func toolbarMenuKeepsSettingsReachableWithoutASelection() throws {
+        var registry = MenuActionRegistry()
+        let builder = FinderMenuBuilder(available: { _ in true }, icon: { _ in nil })
+
+        var settingsOnly: NSMenu?
+        builder.addingSettingsItem(to: &settingsOnly, handler: nil, action: nil)
+        #expect(settingsOnly?.items.map(\.title) == ["OneClick 设置…"])
+
+        let files = try TemporaryFiles()
+        let chosen = selection([try files.directory("folder")])
+        let built = try #require(builder.makeMenu(settings: Settings(targets: sampleTargets), selection: chosen, actions: &registry))
+        // The helper appends in place, so the baseline has to be captured first.
+        let countBefore = built.items.count
+        var withSettings: NSMenu? = built
+        builder.addingSettingsItem(to: &withSettings, handler: nil, action: nil)
+
+        #expect(withSettings === built)
+        #expect(withSettings?.items.last?.title == "OneClick 设置…")
+        // 不加分隔线：Finder 会保留它的占位却不画线，结果只是一块读起来像"缺了一项"
+        // 的空白。设置项改用应用自身的标记与文件操作区分。
+        #expect(withSettings?.items.contains { $0.isSeparatorItem } == false)
+        #expect(withSettings?.items.count == countBefore + 1)
+        #expect(withSettings?.items.last?.image != nil)
+    }
+
+    /// 图标颜色必须由构建菜单的一方决定，不能留给渲染方去着色。
+    ///
+    /// 曾经依赖 SF Symbol 的 template 染色，结果图标以定色位图的形式到达
+    /// Finder（在深色外观下生成为白色），浅色菜单上就看不见了。现在颜色在构建
+    /// 时烤进去，因此所有图标都必须是非 template 的 artwork。
+    @Test func everyMenuImageCarriesItsOwnColour() throws {
+        var registry = MenuActionRegistry()
+        let artwork = NSImage(size: NSSize(width: 512, height: 512))
+        let builder = FinderMenuBuilder(available: { _ in true }, icon: { _ in artwork })
+        let files = try TemporaryFiles()
+        let chosen = selection([try files.directory("folder")])
+        var built = builder.makeMenu(settings: Settings(targets: sampleTargets), selection: chosen, actions: &registry)
+        builder.addingSettingsItem(to: &built, handler: nil, action: nil)
+        let menu = try #require(built)
+
+        var items = menu.items
+        for item in menu.items {
+            if let submenu = item.submenu { items += submenu.items }
+        }
+        let withImages = items.filter { !$0.isSeparatorItem }
+        #expect(withImages.allSatisfy { $0.image != nil })
+        #expect(withImages.allSatisfy { $0.image?.isTemplate == false })
     }
 }

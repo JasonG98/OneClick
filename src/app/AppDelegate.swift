@@ -3,45 +3,23 @@ import OSLog
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    // Background URL requests do not need to initialize the settings UI model.
     lazy var model = SettingsModel()
-    var showSettings: () -> Void = {}
-    private let logger = Logger(subsystem: SharedEnvironment.appIdentifier, category: "requests")
+    private let logger = Logger(subsystem: SharedEnvironment.appIdentifier, category: "settings")
 
-    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
-        logger.info("Settings requested by ordinary launch")
-        showSettings()
-        return false
+    private var presentSettings: (() -> Void)?
+
+    /// Installed by the settings scene once SwiftUI can open windows. The scene
+    /// presents itself on launch, and a reopen request always arrives after the
+    /// scene is built, so there is no pending/replay state to carry.
+    func installSettingsPresenter(_ present: @escaping () -> Void) {
+        presentSettings = present
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         logger.info("Settings requested by application reopen")
-        showSettings()
+        presentSettings?()
         return false
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-
-    func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls {
-            guard let id = OpenRequestLink.requestID(for: url) else { continue }
-            Task { @MainActor in
-                do {
-                    let repository = OpenRequestRepository(directory: try SharedEnvironment.containerURL())
-                    let handler = OpenRequestHandler(requests: repository, settings: try SharedEnvironment.repository())
-                    try await handler.open(id)
-                    let visibleWindows = application.windows.filter(\.isVisible).count
-                    logger.info("Completed Finder open request; visible windows: \(visibleWindows), active: \(application.isActive)")
-                } catch {
-                    logger.error("Open request failed: \(error.localizedDescription, privacy: .public)")
-                    let alert = NSAlert()
-                    alert.messageText = "操作未完成"
-                    alert.informativeText = error.localizedDescription
-                    alert.addButton(withTitle: "好")
-                    NSApp.activate()
-                    alert.runModal()
-                }
-            }
-        }
-    }
 }
