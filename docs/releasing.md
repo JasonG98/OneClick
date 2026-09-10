@@ -77,7 +77,7 @@ Move the checked file to `Casks/oneclick.rb` only after the repository and tap l
 The release-script tests use temporary fake Xcode, signing, and notarization commands. They exercise validation, argument boundaries, operation ordering, architecture rejection, final archive creation, generated SHA-256 values, and generated Ruby syntax without contacting Apple or a release host:
 
 ```bash
-Tests/ReleaseScripts/run_tests.sh
+tests/release-scripts/run_tests.sh
 ```
 
 These tests prove the orchestration and Cask generation behavior. A real release still requires a valid Developer ID identity, a working Keychain notarization profile, successful Apple notarization, and actual GitHub/tap values.

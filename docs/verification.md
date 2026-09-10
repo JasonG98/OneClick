@@ -2,12 +2,20 @@
 
 日期：2026-09-10。环境：macOS 26.6.2、Apple Silicon、Xcode 26.6、Swift 6.3.3。
 
+## 自动化覆盖补齐
+
+- 新增 24 项 Swift Testing 行为测试，覆盖配置模型、真实 NSMenu、应用动作、请求传递及共享容器访问前检查；原有 40 项核心测试保留。
+- `./script/check.sh --build --disable-sandbox --enable-code-coverage -Xswiftc -warnings-as-errors` 通过：64 项 Swift 测试、6 项发布脚本测试、Shell 语法检查，以及主应用和扩展的 arm64 编译。测试构建不签名、不启动；退出时撤销 Xcode 自动注册，增量构建已经无注册时可重复运行。
+- 临时注入六个回归：反转开关、菜单忽略禁用状态、主应用忽略目标禁用、漏清理请求、Terminal 传入文件、跳过共享组前缀检查。对应测试均产生断言失败；恢复源码后完整检查通过。
+- 编入测试包的生产代码行覆盖率为 75.56%，包含未调用的系统适配层，不含 SwiftUI 视图和 Finder 进程接入。覆盖率文件在 `.build/core/arm64-apple-macosx/debug/codecov/`。
+- 本轮未调用 Computer Use。下方 GUI 与签名结果保留为之前开发版的实测记录；本轮验证以自动化测试及编译为限。详细命令与测试边界见 [测试说明](testing.md)。
+
 ## 已通过
 
 | 项目 | 证据 |
 | --- | --- |
 | Swift 核心行为 | `./script/test.sh --disable-sandbox -Xswiftc -warnings-as-errors`：40 项通过 |
-| 分发脚本行为 | `Tests/ReleaseScripts/run_tests.sh`：6 项通过；Bash 语法检查通过 |
+| 分发脚本行为 | `tests/release-scripts/run_tests.sh`：6 项通过；Bash 语法检查通过 |
 | Debug 构建与启动 | `./script/build_and_run.sh --verify` 成功，验证实际开发可执行文件进程 |
 | Release 归档 | `xcodebuild ... -configuration Release ... archive` 成功；归档在 `.build/OneClick.xcarchive` |
 | arm64 限制 | 对 Release 主程序与扩展执行 `lipo -archs`，均只有 `arm64`；最低系统 26.0 |

@@ -46,34 +46,10 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
         guard !selection.urls.isEmpty else { return nil }
         do {
             let settings = try SharedEnvironment.repository().load()
-            let menu = NSMenu()
-            let resolver = ApplicationResolver()
-            let targets = settings.targets.filter { $0.isEnabled && resolver.applicationURL(for: $0) != nil }
-            if !targets.isEmpty {
-                let open = NSMenuItem(title: "在应用中打开", action: nil, keyEquivalent: "")
-                open.image = NSImage(systemSymbolName: "arrow.up.forward.app", accessibilityDescription: nil)
-                let submenu = NSMenu()
-                for target in targets {
-                    let item = NSMenuItem(title: target.name, action: #selector(openTarget(_:)), keyEquivalent: "")
-                    item.target = self
-                    item.tag = actions.insert(selection: selection, target: target)
-                    let icon = resolver.icon(for: target)?.copy() as? NSImage
-                    icon?.size = NSSize(width: 16, height: 16)
-                    item.image = icon
-                    submenu.addItem(item)
-                }
-                open.submenu = submenu
-                menu.addItem(open)
-            }
-            if settings.copiesPaths {
-                let copy = NSMenuItem(title: selection.urls.count > 1 ? "复制 \(selection.urls.count) 个绝对路径" : "复制绝对路径", action: #selector(copyPaths(_:)), keyEquivalent: "")
-                copy.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
-                copy.target = self
-                copy.tag = actions.insert(selection: selection, target: nil)
-                menu.addItem(copy)
-            }
+            let menu = FinderMenuBuilder().makeMenu(settings: settings, selection: selection, actions: &actions,
+                                                   handler: self, openAction: #selector(openTarget(_:)), copyAction: #selector(copyPaths(_:)))
             logger.info("Built menu for \(selection.urls.count) items")
-            return menu.items.isEmpty ? nil : menu
+            return menu
         } catch {
             ActionExecutor().presentFailure(error)
             return nil

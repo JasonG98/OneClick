@@ -11,8 +11,8 @@ case "$ONECLICK_MODE" in
 esac
 cd "$ONECLICK_ROOT"
 ONECLICK_TEAM="${ONECLICK_TEAM_ID:-}"
-if [[ -z "$ONECLICK_TEAM" && -f Config/Local.xcconfig ]]; then
-  ONECLICK_TEAM="$(awk -F= '/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' Config/Local.xcconfig)"
+if [[ -z "$ONECLICK_TEAM" && -f config/Local.xcconfig ]]; then
+  ONECLICK_TEAM="$(awk -F= '/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' config/Local.xcconfig)"
 fi
 ONECLICK_SIGNING_ARGS=(CODE_SIGNING_ALLOWED=NO)
 if [[ -n "$ONECLICK_TEAM" ]]; then
@@ -21,7 +21,7 @@ if [[ -n "$ONECLICK_TEAM" ]]; then
   fi
   ONECLICK_SIGNING_ARGS=(CODE_SIGNING_ALLOWED=YES "DEVELOPMENT_TEAM=$ONECLICK_TEAM" "CODE_SIGN_IDENTITY=${ONECLICK_SIGNING_IDENTITY:-Apple Development}" "ONECLICK_APP_GROUP=$ONECLICK_TEAM.local.oneclick.shared")
 elif [[ "$ONECLICK_MODE" != "--build-only" ]]; then
-  echo "Running Finder integration requires an Apple Development identity and team. Set DEVELOPMENT_TEAM in Config/Local.xcconfig or export ONECLICK_TEAM_ID. Ad hoc signing cannot authorize App Group access on current macOS." >&2
+  echo "Running Finder integration requires an Apple Development identity and team. Set DEVELOPMENT_TEAM in config/Local.xcconfig or export ONECLICK_TEAM_ID. Ad hoc signing cannot authorize App Group access on current macOS." >&2
   exit 2
 fi
 if [[ "$ONECLICK_MODE" != "--build-only" ]]; then

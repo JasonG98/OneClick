@@ -7,6 +7,12 @@ struct SettingsRepository: Sendable {
         self.fileURL = fileURL
     }
 
+    func loadOrCreate(initial: Settings) throws -> Settings {
+        if FileManager.default.fileExists(atPath: fileURL.path) { return try load() }
+        try save(initial)
+        return initial
+    }
+
     func load() throws -> Settings {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return Settings()

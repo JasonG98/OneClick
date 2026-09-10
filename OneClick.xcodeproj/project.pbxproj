@@ -7,17 +7,17 @@
 	"objects" = {
 		"0ACCF632C3826D33BA19BB5F" = {
 			"isa" = "PBXFileSystemSynchronizedRootGroup";
-			"path" = "Shared";
+			"path" = "src/shared";
 			"sourceTree" = "<group>";
 		};
 		"A5660BF89DD2D657048780AB" = {
 			"isa" = "PBXFileSystemSynchronizedRootGroup";
-			"path" = "OneClick";
+			"path" = "src/app";
 			"sourceTree" = "<group>";
 		};
 		"39E53A5B4D47BF25EC27D946" = {
 			"isa" = "PBXFileSystemSynchronizedRootGroup";
-			"path" = "FinderExtension";
+			"path" = "src/finder-extension";
 			"sourceTree" = "<group>";
 		};
 		"DEF93E8F8AC229A0D98BBEFA" = {
@@ -41,7 +41,7 @@
 		"3F60D54AF9989335D88A0458" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "text.xcconfig";
-			"path" = "Config/Signing.xcconfig";
+			"path" = "config/Signing.xcconfig";
 			"sourceTree" = "<group>";
 		};
 		"1E7EC68E24D28B488C4B3DFC" = {
@@ -90,8 +90,8 @@
 				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app.finder";
-				"INFOPLIST_FILE" = "Config/FinderExtension-Info.plist";
-				"CODE_SIGN_ENTITLEMENTS" = "Config/FinderExtension.entitlements";
+				"INFOPLIST_FILE" = "config/FinderExtension-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "config/FinderExtension.entitlements";
 				"APPLICATION_EXTENSION_API_ONLY" = "YES";
 				"SKIP_INSTALL" = "YES";
 				"ENABLE_APP_SANDBOX" = "YES";
@@ -124,8 +124,8 @@
 				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app.finder";
-				"INFOPLIST_FILE" = "Config/FinderExtension-Info.plist";
-				"CODE_SIGN_ENTITLEMENTS" = "Config/FinderExtension.entitlements";
+				"INFOPLIST_FILE" = "config/FinderExtension-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "config/FinderExtension.entitlements";
 				"APPLICATION_EXTENSION_API_ONLY" = "YES";
 				"SKIP_INSTALL" = "YES";
 				"ENABLE_APP_SANDBOX" = "YES";
@@ -221,8 +221,8 @@
 				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app";
-				"INFOPLIST_FILE" = "Config/OneClick-Info.plist";
-				"CODE_SIGN_ENTITLEMENTS" = "Config/OneClick.entitlements";
+				"INFOPLIST_FILE" = "config/OneClick-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "config/OneClick.entitlements";
 				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
 				"DEBUG_INFORMATION_FORMAT" = "dwarf";
 				"SWIFT_ACTIVE_COMPILATION_CONDITIONS" = "DEBUG";
@@ -252,8 +252,8 @@
 				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
 				"PRODUCT_NAME" = "$(TARGET_NAME)";
 				"PRODUCT_BUNDLE_IDENTIFIER" = "local.oneclick.app";
-				"INFOPLIST_FILE" = "Config/OneClick-Info.plist";
-				"CODE_SIGN_ENTITLEMENTS" = "Config/OneClick.entitlements";
+				"INFOPLIST_FILE" = "config/OneClick-Info.plist";
+				"CODE_SIGN_ENTITLEMENTS" = "config/OneClick.entitlements";
 				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
 				"DEBUG_INFORMATION_FORMAT" = "dwarf-with-dsym";
 			};

@@ -12,19 +12,15 @@ final class SettingsModel {
     var availableApplications: [String: URL] = [:]
     var configurationAvailable = false
     private var repository: SettingsRepository?
+    private let services: SettingsServices
     private var notificationTokens: [NSObjectProtocol] = []
 
-    init() {
+    init(services: SettingsServices = .live) {
+        self.services = services
         do {
-            let repository = try SharedEnvironment.repository()
+            let repository = try services.repository()
             self.repository = repository
-            let url = try SharedEnvironment.containerURL().appendingPathComponent("settings.json")
-            if FileManager.default.fileExists(atPath: url.path) {
-                settings = try repository.load()
-            } else {
-                settings = Settings.initial(home: FileManager.default.homeDirectoryForCurrentUser)
-                try repository.save(settings)
-            }
+            settings = try repository.loadOrCreate(initial: Settings.initial(home: services.homeDirectory))
             configurationAvailable = true
         } catch { errorMessage = error.localizedDescription }
         refresh()
@@ -41,19 +37,17 @@ final class SettingsModel {
     }
 
     func refresh() {
-        extensionEnabled = FIFinderSyncController.isExtensionEnabled
-        let resolver = ApplicationResolver()
+        extensionEnabled = services.extensionEnabled()
         availableApplications = Dictionary(uniqueKeysWithValues: settings.targets.compactMap { target in
-            resolver.applicationURL(for: target).map { (target.id, $0) }
+            services.applicationURL(target).map { (target.id, $0) }
         })
         readActionError()
     }
 
     func readActionError() {
-        if let message = SharedEnvironment.takeError() {
+        if let message = services.takeError() {
             errorMessage = message
-            NSApp.activate()
-            NSApp.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
+            services.presentError()
         }
     }
 
@@ -61,7 +55,7 @@ final class SettingsModel {
         guard configurationAvailable, let repository else { return }
         do {
             try repository.save(settings)
-            DistributedNotificationCenter.default().postNotificationName(SharedEnvironment.settingsChanged, object: nil, userInfo: nil, deliverImmediately: true)
+            services.settingsChanged()
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -98,7 +92,11 @@ final class SettingsModel {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
-        for url in panel.urls {
+        addApplications(panel.urls)
+    }
+
+    func addApplications(_ urls: [URL]) {
+        for url in urls {
             guard let bundle = Bundle(url: url), let identifier = bundle.bundleIdentifier else { continue }
             guard !settings.targets.contains(where: { $0.bundleIdentifier == identifier }) else { continue }
             let name = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
@@ -115,7 +113,11 @@ final class SettingsModel {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
-        for url in panel.urls where !settings.directories.contains(url) {
+        addDirectories(panel.urls)
+    }
+
+    func addDirectories(_ urls: [URL]) {
+        for url in urls where !settings.directories.contains(url) {
             settings.directories.append(url)
         }
         save()

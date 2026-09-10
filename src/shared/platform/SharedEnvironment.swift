@@ -8,9 +8,14 @@ enum SharedEnvironment {
     static let errorOccurred = Notification.Name("local.oneclick.error.occurred")
 
     static func containerURL() throws -> URL {
-        guard let identifier = Bundle.main.object(forInfoDictionaryKey: "OneClickAppGroup") as? String,
-              let team = signingTeam, identifier.hasPrefix(team + "."),
-              let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier) else {
+        try containerURL(identifier: Bundle.main.object(forInfoDictionaryKey: "OneClickAppGroup") as? String,
+                         signingTeam: signingTeam,
+                         resolve: { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) })
+    }
+
+    static func containerURL(identifier: String?, signingTeam: String?, resolve: (String) -> URL?) throws -> URL {
+        guard let identifier, let team = signingTeam, !team.isEmpty,
+              identifier.hasPrefix(team + "."), let url = resolve(identifier) else {
             throw PlatformError.sharedContainerUnavailable
         }
         return url
@@ -49,7 +54,7 @@ enum SharedEnvironment {
     }
 }
 
-enum PlatformError: LocalizedError {
+enum PlatformError: LocalizedError, Equatable {
     case sharedContainerUnavailable
     case applicationUnavailable(String)
     case emptySelection

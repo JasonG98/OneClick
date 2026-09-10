@@ -13,7 +13,7 @@
 
 ## 本地构建
 
-安装 Xcode 26 并完成首次启动组件安装，在 Xcode 添加 Apple 开发者账号与开发证书。在本机创建不提交到 Git 的 `Config/Local.xcconfig`：
+安装 Xcode 26 并完成首次启动组件安装，在 Xcode 添加 Apple 开发者账号与开发证书。在本机创建不提交到 Git 的 `config/Local.xcconfig`：
 
 ```xcconfig
 DEVELOPMENT_TEAM = 你的十位TeamID
@@ -46,13 +46,17 @@ DEVELOPMENT_TEAM = 你的十位TeamID
 ## 验证
 
 ```sh
-./script/test.sh
-Tests/ReleaseScripts/run_tests.sh
+./script/check.sh          # Swift 行为测试、分发脚本测试和 Shell 语法检查
+./script/check.sh --build  # 再编译主应用与扩展；不签名、不启动、不操作 Finder
+
+# 开发时只跑受影响的测试
+./script/test.sh --filter SettingsModelTests
+./script/test.sh --filter OpenFlowTests
 ```
 
 受嵌套沙盒限制的开发环境可对 SwiftPM 追加 `--disable-sandbox`；应用自身的 Finder 扩展仍启用 App Sandbox。构建日志在 `.build/logs/build.log`，`./script/build_and_run.sh --telemetry` 可查看 OneClick 的系统日志。
 
-核心逻辑通过 Swift Testing 验证；真实 Finder 菜单、应用启动和目录覆盖仍以 [验收记录](docs/verification.md) 为准。
+核心逻辑、配置模型、真实 NSMenu 构造、打开请求传递与权限访问前检查均通过 Swift Testing 验证。测试仅替换系统调用，使用隔离临时文件，不启动目标应用、不写系统剪贴板、不访问实际 App Group。测试分层与命令见 [测试说明](docs/testing.md)；真实 Finder 接入和视觉外观仍以 [验收记录](docs/verification.md) 为准。
 
 ## Homebrew 分发
 
@@ -62,11 +66,15 @@ Tests/ReleaseScripts/run_tests.sh
 
 | 路径 | 职责 |
 | --- | --- |
-| `OneClick/` | SwiftUI 配置窗口与 Observation 状态 |
-| `FinderExtension/` | Finder 菜单、选择快照和复制路径 |
-| `Shared/Core/` | 选择语义、配置校验、Claude 链接及可测试行为 |
-| `Shared/Platform/` | App Group、应用解析、一次性打开请求与系统 API |
-| `Config/` | 主应用和扩展的 Info.plist、entitlements |
+| `src/app/` | SwiftUI 配置窗口与 Observation 状态 |
+| `src/finder-extension/` | Finder 菜单、选择快照和复制路径 |
+| `src/shared/core/` | 选择语义、配置校验、Claude 链接及可测试行为 |
+| `src/shared/platform/` | App Group、应用解析、一次性打开请求与系统 API |
+| `config/` | 主应用和扩展的 Info.plist、entitlements |
+| `tests/` | 核心逻辑、应用行为和发布脚本测试 |
 | `script/` | 本地构建、测试和发布 |
+| `docs/` | 设计、计划、验证记录和发布说明 |
 
-Xcode 只有主应用和嵌入扩展两个产品 target，共享代码直接编入。Swift Package 单独执行核心测试。工程文件已经提交到源码目录；需要重新生成时运行 `python3 script/generate_project.py`。
+普通目录统一使用小写，多词用连字符；Swift 文件保留类型名称，工程文件与工具固定名称保留原名。项目约定见 [AGENTS.md](AGENTS.md)，插件生成文件时也应遵循这些路径。
+
+Xcode 只有主应用和嵌入扩展两个产品 target，共享代码直接编入。Swift Package 编译同一份共享代码及配置模型，执行核心与行为测试。工程文件已经提交到源码目录；需要重新生成时运行 `python3 script/generate_project.py`。

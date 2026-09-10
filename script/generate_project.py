@@ -31,13 +31,13 @@ common = dict(ARCHS="arm64", ONLY_ACTIVE_ARCH="NO", SDKROOT="macosx", MACOSX_DEP
               CODE_SIGN_STYLE="Manual", CODE_SIGN_IDENTITY="Apple Development", CODE_SIGNING_ALLOWED="YES",
               ONECLICK_APP_GROUP="$(DEVELOPMENT_TEAM).local.oneclick.shared", GENERATE_INFOPLIST_FILE="NO",
               COMBINE_HIDPI_IMAGES="YES", ENABLE_USER_SCRIPT_SANDBOXING="YES")
-shared = add("SharedGroup", "PBXFileSystemSynchronizedRootGroup", path="Shared", sourceTree="<group>")
-appgroup = add("AppGroup", "PBXFileSystemSynchronizedRootGroup", path="OneClick", sourceTree="<group>")
-extgroup = add("ExtensionGroup", "PBXFileSystemSynchronizedRootGroup", path="FinderExtension", sourceTree="<group>")
+shared = add("SharedGroup", "PBXFileSystemSynchronizedRootGroup", path="src/shared", sourceTree="<group>")
+appgroup = add("AppGroup", "PBXFileSystemSynchronizedRootGroup", path="src/app", sourceTree="<group>")
+extgroup = add("ExtensionGroup", "PBXFileSystemSynchronizedRootGroup", path="src/finder-extension", sourceTree="<group>")
 appproduct = add("AppProduct", "PBXFileReference", explicitFileType="wrapper.application", path="OneClick.app", sourceTree="BUILT_PRODUCTS_DIR")
 extproduct = add("ExtProduct", "PBXFileReference", explicitFileType="wrapper.app-extension", path="OneClickFinder.appex", sourceTree="BUILT_PRODUCTS_DIR")
 products = add("Products", "PBXGroup", children=[appproduct, extproduct], name="Products", sourceTree="<group>")
-signing_config = add("SigningConfig", "PBXFileReference", lastKnownFileType="text.xcconfig", path="Config/Signing.xcconfig", sourceTree="<group>")
+signing_config = add("SigningConfig", "PBXFileReference", lastKnownFileType="text.xcconfig", path="config/Signing.xcconfig", sourceTree="<group>")
 root = add("RootGroup", "PBXGroup", children=[appgroup, extgroup, shared, signing_config, products], sourceTree="<group>")
 project_id = hashlib.sha256(b"Project").hexdigest()[:24].upper()
 
@@ -51,7 +51,7 @@ ext = add("Extension", "PBXNativeTarget", name="OneClickFinder", productName="On
           fileSystemSynchronizedGroups=[extgroup, shared],
           buildConfigurationList=configs("Extension", dict(common,
               PRODUCT_NAME="$(TARGET_NAME)", PRODUCT_BUNDLE_IDENTIFIER="local.oneclick.app.finder",
-              INFOPLIST_FILE="Config/FinderExtension-Info.plist", CODE_SIGN_ENTITLEMENTS="Config/FinderExtension.entitlements",
+              INFOPLIST_FILE="config/FinderExtension-Info.plist", CODE_SIGN_ENTITLEMENTS="config/FinderExtension.entitlements",
               APPLICATION_EXTENSION_API_ONLY="YES", SKIP_INSTALL="YES", ENABLE_APP_SANDBOX="YES")))
 proxy = add("ExtensionProxy", "PBXContainerItemProxy", containerPortal=project_id, proxyType=1,
             remoteGlobalIDString=ext, remoteInfo="OneClickFinder")
@@ -65,7 +65,7 @@ app = add("App", "PBXNativeTarget", name="OneClick", productName="OneClick", pro
           buildRules=[], dependencies=[dep], fileSystemSynchronizedGroups=[appgroup, shared],
           buildConfigurationList=configs("App", dict(common,
               PRODUCT_NAME="$(TARGET_NAME)", PRODUCT_BUNDLE_IDENTIFIER="local.oneclick.app",
-              INFOPLIST_FILE="Config/OneClick-Info.plist", CODE_SIGN_ENTITLEMENTS="Config/OneClick.entitlements")))
+              INFOPLIST_FILE="config/OneClick-Info.plist", CODE_SIGN_ENTITLEMENTS="config/OneClick.entitlements")))
 add("Project", "PBXProject", attributes={"LastUpgradeCheck": "2660", "BuildIndependentTargetsInParallel": "YES"},
     buildConfigurationList=configs("Project", common), compatibilityVersion="Xcode 16.0",
     developmentRegion="zh-Hans", hasScannedForEncodings=0, knownRegions=["en", "zh-Hans", "Base"],

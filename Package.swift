@@ -9,11 +9,21 @@ let package = Package(
         .library(name: "OneClickCore", targets: ["OneClickCore"]),
     ],
     targets: [
-        .target(name: "OneClickCore", path: "Shared/Core"),
+        .target(
+            name: "OneClickCore",
+            path: "src",
+            exclude: ["finder-extension", "app/OneClickApp.swift", "app/AppDelegate.swift", "app/views"],
+            sources: ["shared", "app/stores"]
+        ),
         .testTarget(
             name: "OneClickCoreTests",
             dependencies: ["OneClickCore"],
-            path: "Tests/CoreTests"
+            path: "tests/core"
+        ),
+        .testTarget(
+            name: "OneClickBehaviorTests",
+            dependencies: ["OneClickCore"],
+            path: "tests/behavior"
         ),
     ]
 )

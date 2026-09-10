@@ -1,0 +1,94 @@
+import AppKit
+import Testing
+@testable import OneClickCore
+
+final class TemporaryFiles {
+    let root: URL
+
+    init() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("OneClickTests-\(UUID())", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    }
+
+    deinit { try? FileManager.default.removeItem(at: root) }
+
+    func file(_ name: String) throws -> URL {
+        let url = root.appendingPathComponent(name)
+        try Data("fixture".utf8).write(to: url)
+        return url
+    }
+
+    func directory(_ name: String) throws -> URL {
+        let url = root.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func application(_ name: String, identifier: String) throws -> URL {
+        let url = try directory("\(name).app")
+        let contents = url.appendingPathComponent("Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        let data = try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": identifier, "CFBundleName": name], format: .xml, options: 0)
+        try data.write(to: contents.appendingPathComponent("Info.plist"))
+        return url
+    }
+
+    var settings: SettingsRepository { SettingsRepository(fileURL: root.appendingPathComponent("settings.json")) }
+    var requests: OpenRequestRepository { OpenRequestRepository(directory: root) }
+}
+
+enum TestFailure: Error, Equatable { case unavailable }
+
+@MainActor
+final class RecordingWorkspace: WorkspaceOpening {
+    struct FileOpen: Equatable {
+        let urls: [URL]
+        let application: URL
+    }
+    struct LinkOpen: Equatable {
+        let url: URL
+        let activates: Bool
+    }
+    var application: URL? = URL(fileURLWithPath: "/Applications/Test Editor.app")
+    var failure: TestFailure?
+    var files: [FileOpen] = []
+    var links: [LinkOpen] = []
+
+    func applicationURL(for target: OpenTarget) -> URL? { application }
+
+    func open(_ urls: [URL], withApplicationAt application: URL) async throws {
+        if let failure { throw failure }
+        files.append(FileOpen(urls: urls, application: application))
+    }
+
+    func open(_ url: URL, activates: Bool) async throws {
+        if let failure { throw failure }
+        links.append(LinkOpen(url: url, activates: activates))
+    }
+}
+
+@MainActor
+final class SettingsHarness {
+    let files: TemporaryFiles
+    var availableIDs: Set<String> = ["terminal", "vscode"]
+    var extensionEnabled = false
+    var notifications = 0
+
+    init() throws { files = try TemporaryFiles() }
+
+    func model() -> SettingsModel {
+        SettingsModel(services: SettingsServices(
+            repository: { self.files.settings },
+            homeDirectory: files.root,
+            applicationURL: { self.availableIDs.contains($0.id) ? URL(fileURLWithPath: "/Applications/Test.app") : nil },
+            extensionEnabled: { self.extensionEnabled },
+            settingsChanged: { self.notifications += 1 },
+            takeError: { nil },
+            presentError: {}
+        ))
+    }
+}
+
+func selection(_ urls: [URL]) -> SelectionContext {
+    SelectionContext(selected: urls, targeted: nil, isContainer: false)
+}

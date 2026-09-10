@@ -4,4 +4,4 @@ dist/
 *.xcuserstate
 xcuserdata/
 .superpowers/
-Config/Local.xcconfig
+config/Local.xcconfig
