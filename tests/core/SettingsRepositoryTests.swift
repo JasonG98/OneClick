@@ -276,6 +276,43 @@ func repositoryRejectsInvalidDirectoryURLs(_ rawURL: String) throws {
     }
 }
 
+@Test func repositoryRejectsApplicationPathsThatClimbWithParentComponents() throws {
+    try withRepositoryFixture { root, fileURL in
+        let target = OpenTarget(
+            id: "editor",
+            name: "Editor",
+            kind: .application,
+            bundleIdentifier: "test.editor",
+            applicationURL: root.appendingPathComponent("Editor.app/../../tmp/Evil.app"),
+            isEnabled: true
+        )
+
+        #expect(throws: (any Error).self) {
+            try SettingsRepository(fileURL: fileURL).save(Settings(targets: [target]))
+        }
+    }
+}
+
+@Test func repositoryKeepsApplicationNamesThatMerelyContainDots() throws {
+    try withRepositoryFixture { root, fileURL in
+        let application = root.appendingPathComponent("版本..2.app", isDirectory: true)
+        try FileManager.default.createDirectory(at: application, withIntermediateDirectories: true)
+        let target = OpenTarget(
+            id: "editor",
+            name: "版本..2",
+            kind: .application,
+            bundleIdentifier: "test.dots",
+            applicationURL: application,
+            isEnabled: true
+        )
+        let repository = SettingsRepository(fileURL: fileURL)
+
+        try repository.save(Settings(targets: [target]))
+
+        #expect(try repository.load().targets.first?.applicationURL?.path == application.path)
+    }
+}
+
 @Test func repositoryErrorsHaveChineseDescriptions() throws {
     try withRepositoryFixture { _, fileURL in
         try Data("not-json".utf8).write(to: fileURL)

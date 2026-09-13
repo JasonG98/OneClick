@@ -123,10 +123,15 @@ final class SettingsModel {
 
     func addApplications(_ urls: [URL]) {
         for url in urls {
-            guard let bundle = Bundle(url: url), let identifier = bundle.bundleIdentifier else { continue }
+            // Canonicalize before reading the bundle, so the path that gets
+            // stored is the one that was checked. `standardizedFileURL` is a
+            // purely lexical operation, which is what lets it run before the
+            // path is known to exist.
+            let canonical = url.standardizedFileURL
+            guard let bundle = Bundle(url: canonical), let identifier = bundle.bundleIdentifier else { continue }
             guard !settings.targets.contains(where: { $0.bundleIdentifier == identifier }) else { continue }
-            let name = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
-            settings.targets.append(OpenTarget(id: UUID().uuidString, name: name, kind: .application, bundleIdentifier: identifier, applicationURL: url, isEnabled: true))
+            let name = FileManager.default.displayName(atPath: canonical.path).replacingOccurrences(of: ".app", with: "")
+            settings.targets.append(OpenTarget(id: UUID().uuidString, name: name, kind: .application, bundleIdentifier: identifier, applicationURL: canonical, isEnabled: true))
         }
         save()
         refresh()

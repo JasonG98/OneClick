@@ -44,6 +44,20 @@ struct SettingsModelTests {
         #expect(try harness.files.settings.load().targets.map(\.id) == ["terminal"])
     }
 
+    @Test func addedApplicationsAreStoredWithCanonicalPaths() throws {
+        let harness = try SettingsHarness()
+        let app = try harness.files.application("My Editor", identifier: "test.editor")
+        let model = harness.model()
+        // `sub` does not exist, which is the point: canonicalization is purely
+        // lexical, so it must not depend on the intermediate directory being real.
+        let climbing = harness.files.root.appendingPathComponent("sub/../My Editor.app", isDirectory: true)
+
+        model.addApplications([climbing])
+
+        let added = try #require(try harness.files.settings.load().targets.first { $0.bundleIdentifier == "test.editor" })
+        #expect(added.applicationURL?.path == app.path)
+    }
+
     @Test func directoryChangesDeduplicateAndPersist() throws {
         let harness = try SettingsHarness()
         let directory = try harness.files.directory("中文 + project")

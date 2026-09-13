@@ -28,8 +28,15 @@ final class TemporaryFiles {
         let url = try directory("\(name).app")
         let contents = url.appendingPathComponent("Contents", isDirectory: true)
         try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
-        let data = try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": identifier, "CFBundleName": name], format: .xml, options: 0)
+        let data = try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": identifier, "CFBundleName": name, "CFBundleExecutable": name], format: .xml, options: 0)
         try data.write(to: contents.appendingPathComponent("Info.plist"))
+        // ApplicationResolver refuses a bundle without a runnable executable, so
+        // the fixture has to carry one to be resolvable.
+        let executables = contents.appendingPathComponent("MacOS", isDirectory: true)
+        try FileManager.default.createDirectory(at: executables, withIntermediateDirectories: true)
+        let executable = executables.appendingPathComponent(name)
+        try Data("#!/bin/sh\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
         return url
     }
 

@@ -14,6 +14,33 @@ import Testing
     #expect(selection.pathText == "/tmp/中文 O'Brien & #notes.txt\n/tmp/second.txt")
 }
 
+@Test func copyTextRejectsPathsContainingLineBreaks() throws {
+    let lineFeed = URL(fileURLWithPath: "/tmp/report\nrm -rf ~")
+    let carriageReturn = URL(fileURLWithPath: "/tmp/notes\rsecond.txt")
+    let plain = URL(fileURLWithPath: "/tmp/plain.txt")
+
+    #expect(throws: (any Error).self) {
+        try SelectionContext(selected: [lineFeed], targeted: nil, isContainer: false).clipboardText()
+    }
+    #expect(throws: (any Error).self) {
+        try SelectionContext(selected: [carriageReturn], targeted: nil, isContainer: false).clipboardText()
+    }
+    // 一条含换行的路径足以让整份载荷作废：被注入的那一行和相邻路径无从区分。
+    #expect(throws: (any Error).self) {
+        try SelectionContext(selected: [plain, lineFeed], targeted: nil, isContainer: false).clipboardText()
+    }
+}
+
+@Test func copyTextMatchesThePlainPathTextWhenNothingNeedsRejecting() throws {
+    let first = URL(fileURLWithPath: "/tmp/中文 O'Brien & #notes.txt")
+    let second = URL(fileURLWithPath: "/tmp/second.txt")
+    let selection = SelectionContext(selected: [first, second], targeted: nil, isContainer: false)
+
+    #expect(try selection.clipboardText() == selection.pathText)
+    #expect(try selection.clipboardText() == "/tmp/中文 O'Brien & #notes.txt\n/tmp/second.txt")
+    #expect(try SelectionContext(selected: [], targeted: nil, isContainer: false).clipboardText().isEmpty)
+}
+
 @Test func containerUsesCurrentFolderAndIgnoresStaleSelection() {
     let current = URL(fileURLWithPath: "/tmp/current", isDirectory: true)
     let stale = URL(fileURLWithPath: "/tmp/stale.txt")

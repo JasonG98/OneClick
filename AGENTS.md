@@ -21,6 +21,7 @@ contributors. The user-facing description lives in [README.md](README.md).
 - Adapt skill/plugin directory examples to this project layout. Do not create root `App/`, `Views/`, `Sources/`, `Tests/`, `Docs/`, `Scripts/`, or script directories under source directories.
 - Superpowers documents belong in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 - The macOS build/run entrypoint remains `script/build_and_run.sh`; the Codex Run action uses that path.
+- `script/uninstall.sh` removes the app and its data from a Mac, and is the only script that deletes things outside the repository. It reports by default and needs `--apply` to act; keep that default, and keep the ownership checks (container metadata, bundle identifier) rather than matching paths by name.
 - Preserve the existing app, extension, and shared-code boundaries; create additional directories only when needed.
 
 ## Documentation map
@@ -42,6 +43,7 @@ contributors. The user-facing description lives in [README.md](README.md).
 - Run `./script/check.sh --build` for Swift tests, release-script tests, the icon parity check, shell syntax checks, and an unsigned app/extension build without launching the app. In a nested sandbox, append `--disable-sandbox` for SwiftPM.
 - `./script/check.sh` is the only test entrypoint. Anything it does not recognise is forwarded to `swift test`, so SwiftPM flags work directly (`./script/check.sh --filter FinderMenuTests`). `--icons` adds the `.icns` round trip.
 - Keep local signing configuration in ignored `config/Local.xcconfig`.
+- Write the team id as `<Team ID>` in documentation, comments and fixtures. The real value belongs only in `config/Local.xcconfig`, which stays ignored and untracked; `tests/release-scripts/test_repository_hygiene.py` enforces both halves and scans the working tree for the value itself.
 
 ## Tests
 
@@ -68,6 +70,10 @@ These are the constraints that make the app work the way it does. Changing code 
 - **Finder loads a Finder Sync extension once.** Replacing the running extension bundle on disk kills the process and Finder never starts it again, while System Settings still shows the switch as on. `script/build_and_run.sh` re-registers and relaunches the extension after every build; the settings status card treats "enabled" and "running" as two separate facts. Do not regress either one.
 - **The shared App Group needs a real team signature.** Ad hoc signing cannot authorize it and causes repeated "access other app data" prompts, so the build script refuses to run the integrated app without a team, and the extension verifies the signing team before touching the shared container.
 - **Menus are snapshot-based.** Menu construction registers "selection + target" in a bounded action registry and looks it up by tag when the item is clicked; do not move mutable state between those two moments.
+- **The clipboard payload is one path per line, and a path containing a line break is refused rather than escaped.** The newline *is* the separator, so an escaped path would be indistinguishable from two paths — and the paste target is an arbitrary application, not this one. `SelectionContext.clipboardText()` owns that rule; `pathText` stays the raw join for menu snapshots and comparisons. Only copying is restricted: `open` passes URLs and never text, so a file whose name contains a line break still opens.
+- **Only the path the user chose is opened.** `ApplicationResolver` never falls back to a lookup by bundle identifier: that hands the choice to LaunchServices registration order, where another bundle claiming the same identifier takes the action over while the menu still shows the name the user picked. Terminal is the one exception and resolves from its fixed system path, because `.terminal` targets are required to carry no stored path. The accepted cost is that moving or renaming an imported application makes its menu item disappear until the user imports it again.
+- **Everything in the App Group container is writable by any process running as this user.** `settings.json` and `last-error.txt` are inputs, not trusted state: validate before acting on them, and bound anything on its way to the UI. Error text is capped in characters before it is shown and in bytes when it is read, because neither its length nor its encoding is ours to assume.
+- **`applicationURL` is stored canonicalized, and its validation stays a pure check.** Importing an application canonicalizes with `standardizedFileURL` before reading the bundle, so the path that gets stored is the one that was checked. `SettingsRepository.validate` rejects `..` components but must never rewrite data — it runs on load as well as on save. Do not tighten it into requiring canonical equality: `URL` equality is sensitive to `hasDirectoryPath`, a Codable round trip adds a trailing slash, and demanding it would make already-saved good configuration unreadable.
 
 ## Menu wording and application aliases
 

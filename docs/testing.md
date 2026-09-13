@@ -6,15 +6,19 @@
 
 | 测试 | 实际运行的生产逻辑 | 替换的系统边界 |
 | --- | --- | --- |
-| CoreTests | 文件选择与工作目录、路径编码、配置校验与旧版迁移、临时文件读写、主线程桥接、菜单快照、应用别名表与菜单名解析（含"别名不写进配置"） | 无 |
-| SettingsModelTests | 初次配置、持久化、开关、拖动及右键排序、应用/目录添加去重移除、刷新、读写错误 | Finder 状态、应用安装查询、通知和错误窗口 |
+| CoreTests | 文件选择与工作目录、路径编码、配置校验与旧版迁移（含 `..` 路径穿越的拒绝与"文件名里带 `..` 不算穿越"）、临时文件读写、主线程桥接、菜单快照、应用别名表与菜单名解析（含"别名不写进配置"）、含换行路径的剪贴板拒绝 | 无 |
+| SettingsModelTests | 初次配置、持久化、开关、拖动及右键排序、应用/目录添加去重移除（含导入时的路径规范化）、刷新、读写错误 | Finder 状态、应用安装查询、通知和错误窗口 |
 | FinderMenuTests | NSMenu 构造、可用目标过滤与排序、空白处选择、复制菜单、工具栏菜单的设置入口、tag 对应的选择快照、别名在内联项与折叠子菜单项上的文案 | 应用查询和图标 |
-| ActionExecutorTests | 编辑器/Terminal 分流，目录去重，特殊字符，失效选择，错误传递，复制文本 | NSWorkspace 和系统剪贴板 |
+| ActionExecutorTests | 编辑器/Terminal 分流，目录去重，特殊字符，失效选择，错误传递，复制文本，含换行路径拒绝复制但不影响打开 | NSWorkspace 和系统剪贴板 |
+| ApplicationResolverTests | 只解析用户选过的路径；路径失效或 bundle 标识不符时返回 nil 而不是按标识反查；Terminal 走固定系统路径 | 临时应用包 |
 | TargetAvailabilityCacheTests | 正结果缓存、负结果不缓存、失效后重查 | 应用解析与图标查询 |
 | AppGroupAccessTests | 缺少/错误签名必须在容器访问前失败；正确团队和不可用容器 | 受保护容器查询 |
+| SharedEnvironmentErrorTests | 错误文案的字符上限、读取的字节上限、非法 UTF-8 仍产生消息、空文件不弹空窗 | 临时文件 |
+| RepositoryHygiene | `config/Local.xcconfig` 不得入库；真实 Team ID 不得出现在工作区任何位置 | 无（只读 Git 与工作区） |
 | AppLifecycleTests | 重新打开请求设置（含窗口已关闭）、关闭窗口即退出 | 设置窗口展示回调 |
 | ExtensionAvailabilityTests | 开关与进程两种事实的三种状态；重新加载成功与失败后的提示 | Finder 扩展开关、进程存活查询、`pluginkit` |
 | ReleaseScripts | 版本、架构、公证与 Cask 生成的输入输出和失败分支 | Apple/Homebrew 外部命令 |
+| UninstallScript | 只报告不删除、按容器元数据判定归属（名字像但不是它的容器必须留下）、注册撤销走注入的工具、可重复执行、`--build` 为显式开关 | `lsregister`、`pluginkit`、`pgrep`/`pkill`、临时 HOME |
 | IconPipeline | SVG 解析的拒绝路径、填充与描边的光栅化、PNG 编码、`Contents.json`，以及已提交的图标阶梯与美术稿逐字节一致 | 无（纯计算） |
 
 `tests/behavior/TestSupport.swift` 的替身只记录系统调用边界的参数和错误。配置仓库、菜单生成和动作分流始终使用生产实现；每个测试创建独立临时目录并在结束后清理。
@@ -138,3 +142,8 @@ harness 会先把每项的标题、图标尺寸、是否有分隔符打到 `/tmp
 ## 仍未自动化
 
 以下边界需要真实集成验收，不能用单元测试通过来代替：苹果的签名与授权、Finder 的进程间序列化与工具栏按钮渲染、目标应用实际收到的文件与工作目录。
+
+去掉按 bundle 标识反查应用之后，有两项要真机确认（`ApplicationResolverTests` 只能覆盖到解析这一层）：
+
+- 把某个已导入的应用改名或移到别处，右键菜单里那一项应当**消失**，而不是打开另一个自称同一标识的 bundle。
+- Terminal 仍能对文件夹正常工作（它不存路径，走固定的系统位置，是这条规则唯一的例外）。

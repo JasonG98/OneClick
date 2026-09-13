@@ -117,9 +117,15 @@ struct SettingsRepository: Sendable {
 
             let bundleIdentifier = try validatedBundleIdentifier(target.bundleIdentifier)
             if let applicationURL = target.applicationURL {
+                // Climbing components are rejected; canonical equality is
+                // deliberately not required. `URL` equality is sensitive to
+                // `hasDirectoryPath`, and a Codable round trip adds a trailing
+                // slash, so demanding it would make already-saved good
+                // configuration unreadable.
                 guard applicationURL.isLocalFileURL,
+                      !applicationURL.pathComponents.contains(".."),
                       applicationURL.pathExtension.caseInsensitiveCompare("app") == .orderedSame else {
-                    throw OneClickCoreError.invalidSettings("“\(target.name)”的应用路径必须是本地绝对 .app 路径。")
+                    throw OneClickCoreError.invalidSettings("“\(target.name)”的应用路径必须是规范化的本地绝对 .app 路径。")
                 }
             }
 

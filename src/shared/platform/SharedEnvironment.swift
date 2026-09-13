@@ -39,17 +39,43 @@ enum SharedEnvironment {
         SettingsRepository(fileURL: try containerURL().appendingPathComponent("settings.json"))
     }
 
+    /// `last-error.txt` sits in the App Group container, which any process
+    /// running as this user can write, and whatever it holds is rendered in the
+    /// settings alert. Neither its length nor its encoding is ours to assume,
+    /// so both ends are bounded: characters because of the alert, bytes
+    /// because of the read.
+    static let errorTextCharacterLimit = 500
+    static let errorTextByteLimit = 64 * 1024
+
+    static func boundedErrorText(_ text: String, limit: Int = errorTextCharacterLimit) -> String {
+        guard text.count > limit else { return text }
+        // `prefix` counts Characters, so a multi-byte script is not cut mid-scalar.
+        return String(text.prefix(limit)) + "…"
+    }
+
+    /// Reads with a ceiling. `Data(contentsOf:)` would load a huge file whole,
+    /// which kills the process before anything gets a chance to truncate it.
+    static func errorText(readingFrom url: URL, limit: Int = errorTextByteLimit) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: limit), !data.isEmpty else { return nil }
+        // Decoding rather than `String(data:encoding:)`: invalid bytes become
+        // replacement characters instead of making the message disappear.
+        return String(decoding: data, as: UTF8.self)
+    }
+
     static func report(_ error: Error) {
         guard let container = try? containerURL() else { return }
-        try? Data(error.localizedDescription.utf8).write(to: container.appendingPathComponent("last-error.txt"), options: .atomic)
+        let text = boundedErrorText(error.localizedDescription)
+        try? Data(text.utf8).write(to: container.appendingPathComponent("last-error.txt"), options: .atomic)
     }
 
     static func takeError() -> String? {
         guard let container = try? containerURL() else { return nil }
         let url = container.appendingPathComponent("last-error.txt")
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let text = errorText(readingFrom: url) else { return nil }
         try? FileManager.default.removeItem(at: url)
-        return String(data: data, encoding: .utf8)
+        return boundedErrorText(text)
     }
 }
 

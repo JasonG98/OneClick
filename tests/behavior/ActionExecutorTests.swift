@@ -54,4 +54,24 @@ struct ActionExecutorTests {
         let failing = ActionExecutor(workspace: RecordingWorkspace(), writeClipboard: { _ in false })
         #expect(throws: PlatformError.clipboardUnavailable) { try failing.copyPaths(selection([URL(fileURLWithPath: "/tmp/a")])) }
     }
+
+    @Test func copyingRefusesASelectionWhoseNameContainsALineBreak() throws {
+        var writes: [String] = []
+        let executor = ActionExecutor(workspace: RecordingWorkspace(), writeClipboard: { writes.append($0); return true })
+        // 文件名里的换行是合法的，而剪贴板格式用它当分隔符：注入的那一行会
+        // 冒充一条用户没选过的路径。要保的性质是它从未到达剪贴板。
+        let injected = URL(fileURLWithPath: "/tmp/report\nrm -rf ~")
+
+        #expect(throws: (any Error).self) { try executor.copyPaths(selection([injected])) }
+        #expect(writes.isEmpty)
+    }
+
+    @Test func openingStillAcceptsANameContainingALineBreak() async throws {
+        let files = try TemporaryFiles()
+        let url = try files.file("a\nb.txt")
+        let workspace = RecordingWorkspace()
+
+        try await ActionExecutor(workspace: workspace).open(sampleTargets[0], selection: selection([url]))
+        #expect(workspace.files.first?.urls == [url])
+    }
 }

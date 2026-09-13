@@ -39,7 +39,7 @@ struct ActionExecutor {
 
     func copyPaths(_ selection: SelectionContext) throws {
         guard !selection.urls.isEmpty else { throw PlatformError.emptySelection }
-        guard writeClipboard(selection.pathText) else {
+        guard writeClipboard(try selection.clipboardText()) else {
             throw PlatformError.clipboardUnavailable
         }
         logger.info("Copied \(selection.urls.count) paths")

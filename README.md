@@ -57,6 +57,23 @@ printf 'DEVELOPMENT_TEAM = 你的十位TeamID\n' > config/Local.xcconfig
 
 **一条需要说明的权限。** macOS 有个已知问题（rdar://42874694）：Finder 把选中的文件交给扩展时，不附带读取这些文件的授权，导致扩展无法把文件转交给任何应用 —— Terminal 和编辑器一样打不开。因此扩展声明了一条只读的文件访问权限，第一次启用时系统弹的「访问文件」提示就是它。这条权限只给扩展、只读；主程序不参与文件操作。取舍细节见 [AGENTS.md](AGENTS.md#runtime-invariants)。
 
+## 完全卸载
+
+`script/uninstall.sh` 会清掉这个应用在这台 Mac 上留下的全部痕迹。**默认只报告、不删除**，先把要删的东西打出来给你看；确认无误再加 `--apply`：
+
+```sh
+./script/uninstall.sh                    # 报告：会删什么，一行一项，什么都不动
+./script/uninstall.sh --apply            # 执行
+./script/uninstall.sh --apply --build    # 连同 .build/、dist/（Xcode 与本仓库的产物）
+```
+
+它会处理：运行中的主程序与 Finder 扩展进程、LaunchServices 与 PluginKit 注册、**每一份** `OneClick.app`（包括 Xcode 的 DerivedData 副本）、App Group 共享容器、扩展的沙盒容器、偏好设置与缓存、登录项（本应用不注册，但脚本会核对）。
+
+两点值得知道：
+
+- **先关扩展再卸载。** 如果扩展还开着，先在「系统设置 → 通用 → 登录项与扩展 → 文件提供程序」关掉它。系统设置里只有开关、没有删除按钮，所以这一步是"卸载干净"的必要条件，脚本无法代劳（它只能在报告里提醒你）。
+- **它不会乱删。** 归属判断读的是容器管理器自己写的元数据（`MCMMetadataCreator`），不是目录名 —— 名字里带 `oneclick` 但不属于本应用的容器会被跳过；`OneClick.app` 也必须 `CFBundleIdentifier` 匹配才会被删。卸载完成后按脚本提示 `killall Finder`，工具栏按钮随之消失。
+
 ## 常见问题
 
 **右键菜单没了，系统设置里开关却是开的？**
