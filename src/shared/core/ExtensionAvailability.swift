@@ -16,36 +16,15 @@ enum ExtensionAvailability: Equatable {
 
 /// Decides which of those three states is true.
 ///
-/// `heartbeat` is what the extension last wrote about itself. It is only
-/// recorded while the extension is alive, so a fresh timestamp plus a process
-/// that still exists means the menu really is reachable.
+/// `isRunning` is the only evidence, because it is the only evidence that cannot
+/// go stale: the process registry either names a live extension process or it
+/// does not.
 struct ExtensionAvailabilityEvaluator {
-    /// A live extension process is the strong signal; this only backstops a
-    /// recycled process identifier. It has to be long, because Finder asks for
-    /// menus only when the user interacts: an idle machine can leave a perfectly
-    /// healthy extension without a fresh heartbeat for hours.
-    static let notRunningGrace: TimeInterval = 600
-
     var isEnabled: Bool
-    var heartbeat: ExtensionHeartbeat?
-    var isRunning: (ExtensionHeartbeat) -> Bool
-    var now: () -> Date
+    var isRunning: () -> Bool
 
     func evaluate() -> ExtensionAvailability {
         guard isEnabled else { return .disabled }
-        guard let heartbeat, isRunning(heartbeat) else { return .enabledNotRunning }
-        guard now().timeIntervalSince(heartbeat.recordedAt) <= Self.notRunningGrace else {
-            return .enabledNotRunning
-        }
-        return .enabled
+        return isRunning() ? .enabled : .enabledNotRunning
     }
-}
-
-/// The extension's periodic note to the settings window that it is alive.
-struct ExtensionHeartbeat: Codable, Equatable, Sendable {
-    var processIdentifier: Int32
-    var bundleIdentifier: String
-    var recordedAt: Date
-
-    static let fileName = "extension-heartbeat.json"
 }

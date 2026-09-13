@@ -46,17 +46,18 @@ Xcode signs the app and embedded Finder extension with their configured entitlem
 
 ## Generate the Cask
 
-After uploading the exact final ZIP to a stable HTTPS GitHub Release URL, generate the Cask from that same local archive:
+After uploading the exact final ZIP to a stable HTTPS GitHub Release URL, generate the Cask. `release.sh` already wrote `dist/OneClick-<version>.zip`, so the archive path can be left out:
 
 ```bash
 ./script/generate_cask.sh \
   1.2.3 \
   https://github.com/OWNER/REPOSITORY/releases/download/v1.2.3/OneClick-1.2.3.zip \
-  https://github.com/OWNER/REPOSITORY \
-  dist/OneClick-1.2.3.zip
+  https://github.com/OWNER/REPOSITORY
 ```
 
-The generated Cask is written to standard output. It uses the measured archive SHA-256, installs `OneClick.app`, requires Apple Silicon, and requires macOS Tahoe or newer. The generator accepts only plain release versions and conservative HTTPS URLs; it rejects missing archives and values that could become Ruby interpolation or quoting syntax.
+Pass an archive path as a fourth argument to generate the Cask for a different file. The path must exist either way; the default is resolved against `ONECLICK_DIST_DIR` (default `dist/`).
+
+The generated Cask is written to standard output. It uses the measured archive SHA-256, installs `OneClick.app`, requires Apple Silicon, and requires macOS Tahoe or newer. The generator accepts only plain release versions and conservative HTTPS URLs; it rejects missing archives and values that could become Ruby interpolation or quoting syntax. A wrong invocation exits 2, a rejected value exits 1, and neither writes to standard output.
 
 To update a tap file without truncating an existing Cask when validation fails, write to a temporary file first, check it, and then move it into the tap:
 
@@ -65,8 +66,7 @@ temporary_cask="$(mktemp)"
 ./script/generate_cask.sh \
   1.2.3 \
   https://github.com/OWNER/REPOSITORY/releases/download/v1.2.3/OneClick-1.2.3.zip \
-  https://github.com/OWNER/REPOSITORY \
-  dist/OneClick-1.2.3.zip > "$temporary_cask" \
+  https://github.com/OWNER/REPOSITORY > "$temporary_cask" \
   && ruby -c "$temporary_cask"
 ```
 
@@ -74,7 +74,7 @@ Move the checked file to `Casks/oneclick.rb` only after the repository and tap l
 
 ## Script tests
 
-The release-script tests use temporary fake Xcode, signing, and notarization commands. They exercise validation, argument boundaries, operation ordering, architecture rejection, final archive creation, generated SHA-256 values, and generated Ruby syntax without contacting Apple or a release host:
+The release-script tests use temporary fake Xcode, signing, and notarization commands. They exercise validation, argument boundaries, exit statuses, operation ordering, architecture rejection, final archive creation, generated SHA-256 values, generated Ruby syntax, and the Cask generator's default archive resolution without contacting Apple or a release host:
 
 ```bash
 tests/release-scripts/run_tests.sh

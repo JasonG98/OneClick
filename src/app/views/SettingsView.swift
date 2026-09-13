@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -242,11 +243,12 @@ struct SettingsView: View {
     private var targetList: some View {
         List {
             ForEach(Array(model.settings.targets.enumerated()), id: \.element.id) { index, target in
+                let resolved = model.resolved[target.id]
                 ApplicationRow(
                     target: target,
                     enabled: Binding(get: { target.isEnabled }, set: { model.setEnabled(target.id, $0) }),
-                    available: model.availableApplications[target.id] != nil,
-                    icon: model.applicationIcons[target.id],
+                    available: resolved != nil,
+                    icon: resolved?.icon,
                     canMoveUp: index > 0,
                     canMoveDown: index < model.settings.targets.count - 1,
                     moveUp: { model.move(target.id, by: -1) },
@@ -305,7 +307,7 @@ struct SettingsView: View {
     private var directoryList: some View {
         List {
             ForEach(model.settings.directories, id: \.self) { directory in
-                DirectoryRow(directory: directory, homeDirectory: model.homeDirectory) {
+                DirectoryRow(directory: directory) {
                     model.removeDirectory(directory)
                 }
             }
@@ -341,12 +343,17 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// The app's own icon, read from the bundle rather than redrawn here.
+    ///
+    /// The artwork is already a rounded plate with its own lighting, so it is
+    /// shown plain -- putting it on a `panelSurface` would frame it twice -- and
+    /// taking it from `applicationIconImage` means the About pane cannot drift
+    /// from what the Dock and Finder show.
     private var heroMark: some View {
-        Image(systemName: "cursorarrow.click.2")
-            .font(.system(size: 34, weight: .medium))
-            .foregroundStyle(.primary)
-            .frame(width: 80, height: 80)
-            .panelSurface(cornerRadius: 20, fill: AnyShapeStyle(.quaternary))
+        Image(nsImage: NSApplication.shared.applicationIconImage)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: 96, height: 96)
             .accessibilityHidden(true)
     }
 

@@ -92,9 +92,8 @@ struct SettingsModelTests {
         harness.extensionEnabled = true
         model.refresh()
         #expect(model.availableCount == 1)
-        #expect(model.availableApplications["test-vscode"] == nil)
-        #expect(model.availableApplications["test-sublime"] != nil)
-        #expect(model.extensionEnabled)
+        #expect(model.resolved["test-vscode"] == nil)
+        #expect(model.resolved["test-sublime"] != nil)
     }
 
     @Test func corruptConfigurationIsNotOverwritten() throws {

@@ -4,15 +4,26 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// A target's resolved application and the icon that belongs to it.
+struct ResolvedApplication {
+    var url: URL
+    var icon: NSImage
+}
+
 @MainActor @Observable
 final class SettingsModel {
     var settings = Settings()
     var extensionAvailability = ExtensionAvailability.disabled
     var reloadingExtension = false
     var errorMessage: String?
-    var availableApplications: [String: URL] = [:]
-    var applicationIcons: [String: NSImage] = [:]
-    var configurationAvailable = false
+    /// Target id → its resolved application. One dictionary rather than two
+    /// parallel ones: both are built in the same pass, and every consumer that
+    /// wants the icon also wants the URL it was resolved from.
+    var resolved: [String: ResolvedApplication] = [:]
+    /// Whether the stored settings could be loaded. A reachable container is not
+    /// enough: saving over a file that failed to parse would replace a
+    /// recoverable configuration with defaults the user never chose.
+    private var didLoadSettings = false
     private var repository: SettingsRepository?
     private let services: SettingsServices
     private var notificationTokens: [NSObjectProtocol] = []
@@ -23,7 +34,7 @@ final class SettingsModel {
             let repository = try services.repository()
             self.repository = repository
             settings = try repository.loadOrCreate(initial: Settings.initial(home: services.homeDirectory))
-            configurationAvailable = true
+            didLoadSettings = true
         } catch { errorMessage = error.localizedDescription }
         refresh()
         notificationTokens.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
@@ -34,28 +45,28 @@ final class SettingsModel {
         })
     }
 
-    /// Kept as the plain system toggle. `extensionAvailability` is what the
-    /// status card uses, because "enabled" and "running" are different facts.
-    var extensionEnabled: Bool { services.extensionEnabled() }
+    var configurationAvailable: Bool { didLoadSettings }
 
     var availableCount: Int {
-        settings.targets.filter { $0.isEnabled && availableApplications[$0.id] != nil }.count
+        settings.targets.filter { $0.isEnabled && resolved[$0.id] != nil }.count
     }
 
     func refresh() {
         extensionAvailability = services.extensionAvailability()
-        let previousURLs = availableApplications
-        availableApplications = Dictionary(uniqueKeysWithValues: settings.targets.compactMap { target in
-            services.applicationURL(target).map { (target.id, $0) }
-        })
-        // Resolve icons once here instead of inside row bodies: sidebar
-        // toggles re-evaluate every row, and per-row NSWorkspace/Bundle
-        // disk access stutters the split view animation. An icon only changes
-        // when its resolved URL does, so untouched targets keep theirs.
-        applicationIcons = Dictionary(uniqueKeysWithValues: availableApplications.map { id, url in
-            if previousURLs[id] == url, let icon = applicationIcons[id] { return (id, icon) }
-            return (id, NSWorkspace.shared.icon(forFile: url.path))
-        })
+        var next: [String: ResolvedApplication] = [:]
+        for target in settings.targets {
+            guard let url = services.applicationURL(target) else { continue }
+            // Resolve icons once here instead of inside row bodies: sidebar
+            // toggles re-evaluate every row, and per-row NSWorkspace/Bundle
+            // disk access stutters the split view animation. An icon only changes
+            // when its resolved URL does, so untouched targets keep theirs.
+            if let previous = resolved[target.id], previous.url == url {
+                next[target.id] = previous
+            } else {
+                next[target.id] = ResolvedApplication(url: url, icon: NSWorkspace.shared.icon(forFile: url.path))
+            }
+        }
+        resolved = next
         readActionError()
     }
 
@@ -67,7 +78,7 @@ final class SettingsModel {
     }
 
     func save() {
-        guard configurationAvailable, let repository else { return }
+        guard didLoadSettings, let repository else { return }
         do {
             try repository.save(settings)
             services.settingsChanged()
@@ -151,8 +162,6 @@ final class SettingsModel {
     func restoreDefaultDirectory() {
         addDirectories([services.homeDirectory])
     }
-
-    var homeDirectory: URL { services.homeDirectory }
 
     var isDefaultDirectoryConfigured: Bool {
         settings.directories.contains(services.homeDirectory)

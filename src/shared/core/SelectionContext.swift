@@ -22,7 +22,7 @@ struct SelectionContext: Sendable {
         var seenPaths = Set<String>()
 
         for url in urls {
-            guard url.isFileURL, url.isLocalFileURL else {
+            guard url.isLocalFileURL else {
                 throw OneClickCoreError.invalidSelection("仅支持本地文件和文件夹。")
             }
 

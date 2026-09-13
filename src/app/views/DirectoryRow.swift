@@ -2,7 +2,6 @@ import SwiftUI
 
 struct DirectoryRow: View {
     let directory: URL
-    let homeDirectory: URL
     let remove: () -> Void
 
     var body: some View {
@@ -41,10 +40,6 @@ struct DirectoryRow: View {
     }
 
     private var abbreviatedPath: String {
-        let path = directory.path
-        let home = homeDirectory.path
-        if path == home { return "~" }
-        if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
-        return path
+        (directory.path as NSString).abbreviatingWithTildeInPath
     }
 }

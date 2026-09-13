@@ -1,32 +1,24 @@
 #!/bin/bash
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 fail() {
-  echo "release.sh: $1" >&2
-  exit 1
+  oneclick_fail "$1"
 }
 
-is_release_version() {
-  [[ "$1" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+usage() {
+  echo "Usage: ONECLICK_TEAM_ID=... ONECLICK_SIGNING_IDENTITY=... ONECLICK_NOTARY_PROFILE=... $0 VERSION" >&2
 }
 
 if [[ $# -ne 1 ]]; then
-  echo "Usage: ONECLICK_TEAM_ID=... ONECLICK_SIGNING_IDENTITY=... ONECLICK_NOTARY_PROFILE=... $0 VERSION" >&2
-  echo "release.sh: version is required" >&2
-  exit 2
+  usage
+  oneclick_fail_usage "expected exactly one argument (the version), got $#"
 fi
 
 VERSION="$1"
-MISSING=()
-[[ -n "${ONECLICK_TEAM_ID:-}" ]] || MISSING+=("ONECLICK_TEAM_ID")
-[[ -n "${ONECLICK_SIGNING_IDENTITY:-}" ]] || MISSING+=("ONECLICK_SIGNING_IDENTITY")
-[[ -n "${ONECLICK_NOTARY_PROFILE:-}" ]] || MISSING+=("ONECLICK_NOTARY_PROFILE")
-if (( ${#MISSING[@]} > 0 )); then
-  printf 'release.sh: missing required input: %s\n' "${MISSING[@]}" >&2
-  exit 2
-fi
+oneclick_require_env ONECLICK_TEAM_ID ONECLICK_SIGNING_IDENTITY ONECLICK_NOTARY_PROFILE
 
-is_release_version "$VERSION" || fail "version must be a release version such as 1.2.3 (without a v prefix)"
+oneclick_is_version "$VERSION" || fail "version must be a release version such as 1.2.3 (without a v prefix)"
 [[ "$ONECLICK_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || fail "ONECLICK_TEAM_ID must be a 10-character Apple Team ID"
 [[ "$ONECLICK_SIGNING_IDENTITY" == "Developer ID Application: "* ]] || fail "ONECLICK_SIGNING_IDENTITY must name a Developer ID Application identity"
 
@@ -34,7 +26,7 @@ for required_command in xcodebuild lipo codesign xcrun ditto spctl shasum; do
   command -v "$required_command" >/dev/null 2>&1 || fail "required command is unavailable: $required_command"
 done
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(oneclick_root)"
 DERIVED_DATA_PATH="${ONECLICK_DERIVED_DATA_PATH:-$ROOT/.build/ReleaseDerivedData}"
 DIST_DIR="${ONECLICK_DIST_DIR:-$ROOT/dist}"
 RELEASE_WORK_DIR="$(dirname "$DERIVED_DATA_PATH")"

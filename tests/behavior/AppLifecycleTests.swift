@@ -17,7 +17,9 @@ struct AppLifecycleTests {
         #expect(presentations == 2)
     }
 
-    @Test func closingSettingsDoesNotTerminateBackgroundProcessing() {
-        #expect(!AppDelegate().applicationShouldTerminateAfterLastWindowClosed(NSApplication.shared))
+    /// The window is the app's entire surface -- the Finder extension does the
+    /// work -- so dismissing it must not leave a process and a Dock icon behind.
+    @Test func closingSettingsQuitsInsteadOfLingering() {
+        #expect(AppDelegate().applicationShouldTerminateAfterLastWindowClosed(NSApplication.shared))
     }
 }

@@ -102,6 +102,54 @@ class GenerateCaskTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(result.stdout, "")
 
+    def test_archive_path_may_be_omitted_and_defaults_to_the_release_output(self):
+        """The documented flow should not need the path repeated.
+
+        release.sh always writes dist/OneClick-<version>.zip, so the Cask for that
+        release can be generated from the same three arguments rather than from a
+        path the caller has to look up -- and looking it up is how a Cask ends up
+        hashing the wrong file.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            dist = Path(directory) / "dist"
+            dist.mkdir()
+            archive = dist / "OneClick-1.2.3.zip"
+            archive.write_bytes(b"a controlled OneClick archive\n")
+
+            environment = os.environ.copy()
+            environment["ONECLICK_DIST_DIR"] = str(dist)
+            arguments = ["1.2.3", "https://example.com/OneClick-1.2.3.zip", "https://example.com"]
+
+            defaulted = run([CASK_SCRIPT, *arguments], env=environment)
+            self.assertEqual(defaulted.returncode, 0, defaulted.stderr)
+            explicit = run([CASK_SCRIPT, *arguments, archive], env=environment)
+
+            self.assertIn(f'sha256 "{hashlib.sha256(archive.read_bytes()).hexdigest()}"',
+                          defaulted.stdout)
+            self.assertEqual(defaulted.stdout, explicit.stdout)
+
+    def test_omitted_archive_that_does_not_exist_says_how_to_get_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            environment = os.environ.copy()
+            environment["ONECLICK_DIST_DIR"] = str(Path(directory) / "dist")
+
+            result = run(
+                [CASK_SCRIPT, "9.9.9", "https://example.com/OneClick.zip", "https://example.com"],
+                env=environment,
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("release.sh 9.9.9", result.stderr)
+            self.assertIn("ARCHIVE_PATH", result.stderr)
+
+    def test_wrong_argument_count_exits_two(self):
+        for arguments in ([], ["1.2.3"], ["1.2.3", "https://example.com", "https://example.com", "a", "b"]):
+            with self.subTest(arguments=arguments):
+                result = run([CASK_SCRIPT, *arguments])
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, "")
+
 
 class ReleaseScriptTests(unittest.TestCase):
     def setUp(self):
@@ -168,6 +216,32 @@ class ReleaseScriptTests(unittest.TestCase):
                 result = run([RELEASE_SCRIPT, version], env=environment)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(self.log.exists(), "an external release command ran")
+
+    def test_exit_status_separates_a_bad_invocation_from_a_failed_release(self):
+        """2 means "you called it wrong", 1 means "the work could not be done".
+
+        Scripts and operators both branch on that difference, so it is pinned
+        here rather than left to whatever `fail` happens to use.
+        """
+        cases = [
+            ("no version", [], {}, 2),
+            ("too many arguments", ["1.2.3", "extra"], {}, 2),
+            ("missing inputs", ["1.2.3"], {"ONECLICK_TEAM_ID", "ONECLICK_SIGNING_IDENTITY"}, 2),
+            ("malformed version", ["1.2;touch-pwned"], {}, 1),
+            ("malformed team", ["1.2.3"], {"ONECLICK_TEAM_ID": "not a team"}, 1),
+        ]
+
+        for label, arguments, replacements, expected in cases:
+            with self.subTest(label=label):
+                environment = self.environment.copy()
+                for name in (replacements if isinstance(replacements, set) else ()):
+                    environment.pop(name)
+                if isinstance(replacements, dict):
+                    environment.update(replacements)
+                result = run([RELEASE_SCRIPT, *arguments], env=environment)
+                self.assertEqual(result.returncode, expected, result.stderr)
+                if "version" in label:
+                    self.assertIn("version", result.stderr)
 
     def test_prepares_signed_notarized_stapled_arm64_archive_in_order(self):
         result = run([RELEASE_SCRIPT, "1.2.3"], env=self.environment)

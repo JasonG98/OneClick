@@ -14,27 +14,11 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
         super.init()
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(settingsDidChange), name: SharedEnvironment.settingsChanged, object: nil)
         refreshDirectories()
-        recordHeartbeat()
         logger.info("Finder extension initialized")
     }
 
     deinit {
         DistributedNotificationCenter.default().removeObserver(self)
-        if let container = try? SharedEnvironment.containerURL() {
-            ExtensionLiveness.clearHeartbeat(container: container)
-        }
-    }
-
-    /// Tells the settings window that this process is alive.
-    ///
-    /// The system toggle stays "on" after this process dies, which is exactly the
-    /// state that used to leave the app claiming the extension was working while
-    /// Finder showed no menu at all. The heartbeat is refreshed on every menu
-    /// request because Finder keeps one extension process resident for the whole
-    /// session and asks it for menus repeatedly.
-    private func recordHeartbeat() {
-        guard let container = try? SharedEnvironment.containerURL() else { return }
-        ExtensionLiveness.recordHeartbeat(container: container, bundleIdentifier: SharedEnvironment.extensionIdentifier)
     }
 
     /// The toolbar button is the app's only persistent entry point.
@@ -45,7 +29,7 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
     /// calling the getters, so they are overridden rather than assigned.
     override var toolbarItemName: String { "OneClick" }
 
-    override var toolbarItemToolTip: String { "OneClick：用指定应用打开，或复制绝对路径" }
+    override var toolbarItemToolTip: String { "OneClick：用指定应用打开，或复制路径" }
 
     override var toolbarItemImage: NSImage { Self.toolbarImage }
 
@@ -57,8 +41,8 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
     }()
 
     @objc private func settingsDidChange() {
-        refreshDirectories()
-        Task { @MainActor in self.invalidateAvailabilityIfResolutionChanged() }
+        let settings = refreshDirectories()
+        Task { @MainActor in self.invalidateAvailabilityIfResolutionChanged(settings) }
     }
 
     @MainActor private var lastResolutionFingerprint: String?
@@ -67,8 +51,8 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
     /// an application resolves, so the cache only pays a full re-resolution when
     /// a resolution input actually moved.
     @MainActor
-    private func invalidateAvailabilityIfResolutionChanged() {
-        guard let settings = try? SharedEnvironment.repository().load() else {
+    private func invalidateAvailabilityIfResolutionChanged(_ settings: Settings?) {
+        guard let settings else {
             availabilityCache.invalidate()
             return
         }
@@ -80,25 +64,31 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
         availabilityCache.invalidate()
     }
 
-    private func refreshDirectories() {
+    /// Returns the configuration it loaded: the refresh triggered by a settings
+    /// change also needs it to decide whether resolution inputs moved, and that
+    /// must not cost a second read of the same file.
+    @discardableResult
+    private func refreshDirectories() -> Settings? {
         do {
             let settings = try SharedEnvironment.repository().load()
             let roots = Set(settings.directories)
             // Re-assigning the same roots makes Finder re-register every time a
             // refresh is triggered; only touch it when the set really changed.
-            guard FIFinderSyncController.default().directoryURLs != roots else { return }
-            FIFinderSyncController.default().directoryURLs = roots
-            logger.info("Observing \(roots.count) configured roots")
+            if FIFinderSyncController.default().directoryURLs != roots {
+                FIFinderSyncController.default().directoryURLs = roots
+                logger.info("Observing \(roots.count) configured roots")
+            }
+            return settings
         } catch {
             FIFinderSyncController.default().directoryURLs = []
             SharedEnvironment.report(error)
             logger.error("Configuration unavailable: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
         logger.info("Menu requested, kind \(menuKind.rawValue)")
-        recordHeartbeat()
         // Finder supplies selection only during this synchronous XPC callback.
         // Capture it here, then construct AppKit objects on the main queue.
         let controller = FIFinderSyncController.default()
@@ -110,7 +100,6 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
 
     override func beginObservingDirectory(at url: URL) {
         logger.info("Finder began observing a configured directory")
-        recordHeartbeat()
     }
 
     @MainActor private func makeMenu(selection: SelectionContext, includeSettings: Bool) -> NSMenu? {

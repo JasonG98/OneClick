@@ -7,55 +7,23 @@ import Testing
 /// after a rebuild the extension process is gone while System Settings still
 /// says "on", and Finder never starts it again by itself.
 @Suite struct ExtensionAvailabilityTests {
-    private func heartbeat(ago: TimeInterval, pid: Int32 = 4242) -> ExtensionHeartbeat {
-        ExtensionHeartbeat(
-            processIdentifier: pid,
-            bundleIdentifier: "local.oneclick.app.finder",
-            recordedAt: Date().addingTimeInterval(-ago)
-        )
-    }
-
-    private func evaluate(isEnabled: Bool, heartbeat: ExtensionHeartbeat?, isRunning: Bool) -> ExtensionAvailability {
-        ExtensionAvailabilityEvaluator(
-            isEnabled: isEnabled,
-            heartbeat: heartbeat,
-            isRunning: { _ in isRunning },
-            now: { Date() }
-        ).evaluate()
+    private func evaluate(isEnabled: Bool, isRunning: Bool) -> ExtensionAvailability {
+        ExtensionAvailabilityEvaluator(isEnabled: isEnabled, isRunning: { isRunning }).evaluate()
     }
 
     @Test func disabledToggleWinsOverEverythingElse() {
-        #expect(evaluate(isEnabled: false, heartbeat: heartbeat(ago: 0), isRunning: true) == .disabled)
-        #expect(evaluate(isEnabled: false, heartbeat: nil, isRunning: false) == .disabled)
+        #expect(evaluate(isEnabled: false, isRunning: true) == .disabled)
+        #expect(evaluate(isEnabled: false, isRunning: false) == .disabled)
     }
 
-    @Test func enabledExtensionWithNoHeartbeatIsNotRunning() {
-        #expect(evaluate(isEnabled: true, heartbeat: nil, isRunning: false) == .enabledNotRunning)
+    /// The exact state a rebuild produces: the system toggle is still on and the
+    /// extension process behind it is gone.
+    @Test func enabledExtensionWithNoRunningProcessIsNotRunning() {
+        #expect(evaluate(isEnabled: true, isRunning: false) == .enabledNotRunning)
     }
 
-    /// The exact state a rebuild produces: the system toggle is still on, the
-    /// last heartbeat names a process that no longer exists.
-    @Test func enabledExtensionWhoseProcessDiedIsNotRunning() {
-        #expect(evaluate(isEnabled: true, heartbeat: heartbeat(ago: 1), isRunning: false) == .enabledNotRunning)
-    }
-
-    @Test func liveExtensionWithAFreshHeartbeatIsReportedAsEnabled() {
-        #expect(evaluate(isEnabled: true, heartbeat: heartbeat(ago: 1), isRunning: true) == .enabled)
-    }
-
-    /// Finder asks for menus only when the user interacts, so a healthy but idle
-    /// extension can go a long time between heartbeats. Anything inside the grace
-    /// window is still the live extension, not a dead one.
-    @Test func anIdleButAliveExtensionStaysEnabled() {
-        let withinGrace = ExtensionAvailabilityEvaluator.notRunningGrace - 60
-        #expect(evaluate(isEnabled: true, heartbeat: heartbeat(ago: withinGrace), isRunning: true) == .enabled)
-    }
-
-    /// A heartbeat old enough to predate this session cannot vouch for the
-    /// process that is running now.
-    @Test func aStaleHeartbeatBeyondTheGraceWindowIsNotRunning() {
-        let stale = heartbeat(ago: ExtensionAvailabilityEvaluator.notRunningGrace + 60)
-        #expect(evaluate(isEnabled: true, heartbeat: stale, isRunning: true) == .enabledNotRunning)
+    @Test func runningExtensionIsReportedAsEnabled() {
+        #expect(evaluate(isEnabled: true, isRunning: true) == .enabled)
     }
 }
 
@@ -66,14 +34,8 @@ struct ExtensionReloadTests {
     @Test func modelReportsTheExtensionProcessNotTheToggleAlone() throws {
         let harness = try SettingsHarness()
         harness.extensionEnabled = true
-        harness.extensionHeartbeat = ExtensionHeartbeat(
-            processIdentifier: 4242,
-            bundleIdentifier: "local.oneclick.app.finder",
-            recordedAt: Date()
-        )
         harness.extensionRunning = false
         let model = harness.model()
-        #expect(model.extensionEnabled)
         #expect(model.extensionAvailability == .enabledNotRunning)
 
         harness.extensionRunning = true

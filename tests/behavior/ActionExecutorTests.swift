@@ -30,6 +30,8 @@ struct ActionExecutorTests {
         await #expect(throws: PlatformError.emptySelection) { try await executor.open(sampleTargets[0], selection: selection([])) }
         await #expect(throws: (any Error).self) { try await executor.open(sampleTargets[0], selection: selection([URL(fileURLWithPath: "/oneclick-tests-missing/\(UUID())")])) }
         workspace.application = nil
+        // 报错用应用自己的全名，不是菜单里的短名：用户要在设置窗口里按这个名字
+        // 找到那个应用。别名只作用于菜单文案（见 ApplicationAliasTests 与 AGENTS.md）。
         await #expect(throws: PlatformError.applicationUnavailable("Visual Studio Code")) { try await executor.open(sampleTargets[0], selection: selection([URL(fileURLWithPath: "/tmp")])) }
         #expect(workspace.files.isEmpty)
     }

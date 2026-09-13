@@ -15,14 +15,7 @@ struct MenuActionRegistry {
 
     mutating func insert(selection: SelectionContext, target: OpenTarget?) -> Int {
         let tag = nextTag
-        let (followingTag, overflow) = nextTag.addingReportingOverflow(1)
-        if overflow {
-            actions.removeAll(keepingCapacity: true)
-            insertionOrder.removeAll(keepingCapacity: true)
-            nextTag = 1
-        } else {
-            nextTag = followingTag
-        }
+        nextTag += 1
 
         if insertionOrder.count == capacity, let oldestTag = insertionOrder.first {
             actions.removeValue(forKey: oldestTag)

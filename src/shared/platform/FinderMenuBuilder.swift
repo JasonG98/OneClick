@@ -2,8 +2,12 @@ import AppKit
 
 @MainActor
 struct FinderMenuBuilder {
-    var available: (OpenTarget) -> Bool = { ApplicationResolver().applicationURL(for: $0) != nil }
-    var icon: (OpenTarget) -> NSImage? = { ApplicationResolver().icon(for: $0) }
+    /// Both are injected, never defaulted: the extension passes its long-lived
+    /// `TargetAvailabilityCache`, tests pass fixtures. A default would resolve
+    /// applications from scratch on every menu build, which is exactly the cold
+    /// path that cache exists to keep off Finder's blocking callback.
+    let available: (OpenTarget) -> Bool
+    let icon: (OpenTarget) -> NSImage?
 
     /// Every menu image shares one box: app icons and symbols otherwise arrive
     /// at different heights (16x16 against 16x18) and the icon column jitters.
@@ -28,15 +32,26 @@ struct FinderMenuBuilder {
     /// on a light menu and disappeared. The colour is resolved here instead, at
     /// menu-build time. The menu is rebuilt on every invocation, so the icons
     /// always match the appearance in force when the menu was opened.
+    /// Cached by name and resolved colour. Building a symbol costs more than
+    /// building the rest of the menu put together, and these are three fixed
+    /// decorations rebuilt on every invocation. Keying on the colour keeps the
+    /// bake-at-build-time rule: switching appearance resolves a different image
+    /// instead of reusing a stale one.
+    private static var symbolImages: [String: NSImage] = [:]
+
     private static func symbol(_ name: String) -> NSImage? {
+        let foreground = menuForegroundColor
+        let key = "\(name)|\(foreground == .white)"
+        if let cached = symbolImages[key] { return cached }
         let configuration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [menuForegroundColor]))
+            .applying(NSImage.SymbolConfiguration(paletteColors: [foreground]))
         guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(configuration) else { return nil }
         image.size = imageSize
         // The colour is already baked in; a template flag would let the renderer
         // tint it again and undo the work.
         image.isTemplate = false
+        symbolImages[key] = image
         return image
     }
 
@@ -52,6 +67,10 @@ struct FinderMenuBuilder {
     /// How many applications sit in the top level before the rest fold into a
     /// submenu. The submenu header carries the verb, so its entries are plain
     /// application names — the same wording `NSMenu` uses for "打开方式".
+    ///
+    /// Both positions print `OpenTarget.menuName`, never `name`: a long name
+    /// ("用 Visual Studio Code 打开") spends the whole row on a name every user
+    /// abbreviates anyway. Aliases live in `ApplicationAlias`, one entry per app.
     private static let inlineTargetLimit = 3
 
     func makeMenu(settings: Settings, selection: SelectionContext, actions: inout MenuActionRegistry,
@@ -68,7 +87,7 @@ struct FinderMenuBuilder {
         let submenu = NSMenu()
         for (index, target) in targets.enumerated() {
             let inline = index < Self.inlineTargetLimit
-            let title = inline ? "用 \(target.name) 打开" : target.name
+            let title = inline ? "用 \(target.menuName) 打开" : target.menuName
             let item = NSMenuItem(title: title, action: openAction, keyEquivalent: "")
             item.target = handler
             item.tag = actions.insert(selection: selection, target: target)
@@ -85,7 +104,9 @@ struct FinderMenuBuilder {
             open.submenu = submenu
             menu.addItem(open)
         }
-        let copy = NSMenuItem(title: selection.urls.count > 1 ? "复制 \(selection.urls.count) 个绝对路径" : "复制绝对路径", action: copyAction, keyEquivalent: "")
+        // 菜单文案只写"复制路径"：动作结果不变（仍然是绝对路径），但标题不该
+        // 把实现细节塞给用户 —— 长度和"绝对"两个字都是负担。语义写在 README 里。
+        let copy = NSMenuItem(title: selection.urls.count > 1 ? "复制 \(selection.urls.count) 个路径" : "复制路径", action: copyAction, keyEquivalent: "")
         copy.image = Self.symbol("doc.on.doc")
         copy.target = handler
         copy.tag = actions.insert(selection: selection, target: nil)

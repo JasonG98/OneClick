@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- macOS 风格右键菜单应用图标 · SVG 优化版 -->
+  <defs>
+    <!-- 底板：上亮下深的纵向渐变，中段加一个色标让过渡更匀 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4A90FF"/>
+      <stop offset="0.55" stop-color="#1F73E8"/>
+      <stop offset="1" stop-color="#0058D0"/>
+    </linearGradient>
+    <!-- 顶部柔光：模拟抛光面的一道高光，到底部淡出 -->
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 单层圆角方形底色（macOS 标准 824 网格，无外边框、无嵌套层） -->
+  <rect x="100" y="100" width="824" height="824" rx="190" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="190" fill="url(#sheen)"/>
+
+  <!-- 全部白色图形统一做光学居中微调 -->
+  <g transform="translate(14, 8)">
+  <!-- 右键波纹：两层同心圆弧，以指针尖 (408,452) 为圆心，
+       环绕左上方展开，与指针、菜单线保持干净间隙 -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round">
+    <path d="M 351 593 A 152 152 0 1 1 528 358"/>
+    <path d="M 374 537 A 92 92 0 1 1 480 395"/>
+  </g>
+
+  <!-- 右侧菜单列表：三根圆端点横线，居中错落 -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round">
+    <path d="M 662 436 H 762"/>
+    <path d="M 637 504 H 787"/>
+    <path d="M 662 572 H 762"/>
+  </g>
+
+  <!-- 经典 Mac 鼠标指针（实心 + 圆角连接） -->
+  <path d="M 408 452
+           L 408 672
+           L 463 622
+           L 513 707
+           L 548 694
+           L 500 608
+           L 590 578
+           Z"
+        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="8"
+        stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

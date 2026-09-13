@@ -3,7 +3,6 @@ import Security
 
 enum SharedEnvironment {
     static let appIdentifier = "local.oneclick.app"
-    static let extensionIdentifier = "local.oneclick.app.finder"
     static let settingsChanged = Notification.Name("local.oneclick.settings.changed")
     static let errorOccurred = Notification.Name("local.oneclick.error.occurred")
 

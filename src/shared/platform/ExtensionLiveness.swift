@@ -1,40 +1,34 @@
 import AppKit
-import Darwin
 import Foundation
 
-/// Reads and writes the shared note that says the Finder extension is alive.
+/// Asks the system whether the Finder extension is alive.
 ///
-/// Both processes go through the app group container rather than `pluginkit`
-/// queries: the container is already the shared channel for settings, it needs
-/// no extra entitlement, and it stays readable while the extension is not.
+/// Liveness is not something the extension can report about itself. A note it
+/// writes cannot outlive it: `deinit` never runs when the process is killed, and
+/// every rebuild replaces the `.appex` underneath the running process. The
+/// process registry already holds the answer, and it is the only copy of it that
+/// stays true while the extension is gone.
 enum ExtensionLiveness {
-    /// The extension process cannot see the settings window's clock, and the
-    /// settings window cannot see the extension's, so both sides agree on one
-    /// value: the extension writes `Date()` and the app compares it with its own.
-    @discardableResult
-    static func recordHeartbeat(container: URL, bundleIdentifier: String, now: Date = Date()) -> Bool {
-        let heartbeat = ExtensionHeartbeat(
-            processIdentifier: ProcessInfo.processInfo.processIdentifier,
-            bundleIdentifier: bundleIdentifier,
-            recordedAt: now
-        )
-        guard let data = try? JSONEncoder().encode(heartbeat) else { return false }
-        return (try? data.write(to: container.appendingPathComponent(ExtensionHeartbeat.fileName), options: .atomic)) != nil
+    /// The extension this build ships, where Xcode embeds it.
+    static var embeddedExtensionURL: URL? {
+        Bundle.main.builtInPlugInsURL?.appendingPathComponent("OneClickFinder.appex")
     }
 
-    static func heartbeat(container: URL) -> ExtensionHeartbeat? {
-        let url = container.appendingPathComponent(ExtensionHeartbeat.fileName)
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(ExtensionHeartbeat.self, from: data)
-    }
-
-    static func clearHeartbeat(container: URL) {
-        try? FileManager.default.removeItem(at: container.appendingPathComponent(ExtensionHeartbeat.fileName))
-    }
-
-    static func isRunning(_ heartbeat: ExtensionHeartbeat) -> Bool {
-        NSRunningApplication(processIdentifier: heartbeat.processIdentifier)?
-            .bundleIdentifier == heartbeat.bundleIdentifier
+    /// Whether the shipped extension is running right now.
+    ///
+    /// The identifier comes from the built appex rather than a repeated constant,
+    /// so the answer is about *this* build's extension. A stale copy left
+    /// registered by Xcode still reports as running, which is honest: it is
+    /// serving Finder's menus either way.
+    ///
+    /// Only the app asks this, and only the app may: the query needs the
+    /// process registry, which a sandboxed caller cannot see. The extension is
+    /// sandboxed; its container app deliberately is not (`config/` — the
+    /// extension carries an app-sandbox entitlement, the app carries only the
+    /// app group). Sandboxing the app would turn every answer false.
+    static func isRunning(extension appex: URL?) -> Bool {
+        guard let appex, let identifier = Bundle(url: appex)?.bundleIdentifier else { return false }
+        return !NSRunningApplication.runningApplications(withBundleIdentifier: identifier).isEmpty
     }
 }
 
@@ -55,18 +49,15 @@ enum FinderExtensionController {
     /// The work is off the main actor: `pluginkit` is a child process and the
     /// wait can last several seconds, and none of that belongs on the thread
     /// drawing the settings window.
-    static func reload(appex: URL, bundleIdentifier: String, container: URL, timeout: TimeInterval = 8) async -> Bool {
-        await Task.detached { () -> Bool in
+    static func reload(appex: URL, timeout: TimeInterval = 8) async -> Bool {
+        guard let identifier = Bundle(url: appex)?.bundleIdentifier else { return false }
+        return await Task.detached { () -> Bool in
             _ = run(pluginkit, ["-a", appex.path])
-            _ = run(pluginkit, ["-e", "use", "-i", bundleIdentifier])
+            _ = run(pluginkit, ["-e", "use", "-i", identifier])
 
             let deadline = Date().addingTimeInterval(timeout)
             while Date() < deadline {
-                if let heartbeat = ExtensionLiveness.heartbeat(container: container),
-                   ExtensionLiveness.isRunning(heartbeat),
-                   heartbeat.recordedAt >= Date().addingTimeInterval(-timeout) {
-                    return true
-                }
+                if ExtensionLiveness.isRunning(extension: appex) { return true }
                 try? await Task.sleep(for: .milliseconds(250))
             }
             return false

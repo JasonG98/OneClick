@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generate the small Xcode project using only the Python standard library."""
+"""Generate the small Xcode project using only the Python standard library.
+
+Run this after changing project paths or settings, never edit the generated
+project by hand. The output is deterministic, so a rerun must leave
+`git diff OneClick.xcodeproj` empty -- that emptiness is the self-check.
+"""
 from pathlib import Path
 import hashlib
 import json
@@ -15,10 +20,11 @@ def add(object_key, kind, **fields):
 def configs(name, settings):
     ids = []
     for mode in ("Debug", "Release"):
+        debug = mode == "Debug"
         values = dict(settings)
-        values.update(SWIFT_OPTIMIZATION_LEVEL="-Onone" if mode == "Debug" else "-O",
-                      DEBUG_INFORMATION_FORMAT="dwarf" if mode == "Debug" else "dwarf-with-dsym")
-        if mode == "Debug":
+        values.update(SWIFT_OPTIMIZATION_LEVEL="-Onone" if debug else "-O",
+                      DEBUG_INFORMATION_FORMAT="dwarf" if debug else "dwarf-with-dsym")
+        if debug:
             values["SWIFT_ACTIVE_COMPILATION_CONDITIONS"] = "DEBUG"
         ids.append(add(name + mode, "XCBuildConfiguration", name=mode, buildSettings=values,
                        baseConfigurationReference=signing_config))
@@ -65,7 +71,11 @@ app = add("App", "PBXNativeTarget", name="OneClick", productName="OneClick", pro
           buildRules=[], dependencies=[dep], fileSystemSynchronizedGroups=[appgroup, shared],
           buildConfigurationList=configs("App", dict(common,
               PRODUCT_NAME="$(TARGET_NAME)", PRODUCT_BUNDLE_IDENTIFIER="local.oneclick.app",
-              INFOPLIST_FILE="config/OneClick-Info.plist", CODE_SIGN_ENTITLEMENTS="config/OneClick.entitlements")))
+              INFOPLIST_FILE="config/OneClick-Info.plist", CODE_SIGN_ENTITLEMENTS="config/OneClick.entitlements",
+              # The app icon lives in the asset catalog under the app group, which
+              # the target picks up automatically. Naming it here is what makes
+              # actool emit the .icns and the CFBundleIconName the Dock reads.
+              ASSETCATALOG_COMPILER_APPICON_NAME="AppIcon")))
 add("Project", "PBXProject", attributes={"LastUpgradeCheck": "2660", "BuildIndependentTargetsInParallel": "YES"},
     buildConfigurationList=configs("Project", common), compatibilityVersion="Xcode 16.0",
     developmentRegion="zh-Hans", hasScannedForEncodings=0, knownRegions=["en", "zh-Hans", "Base"],
@@ -73,16 +83,23 @@ add("Project", "PBXProject", attributes={"LastUpgradeCheck": "2660", "BuildIndep
     preferredProjectObjectVersion=77)
 
 def encode(value, indent=0):
+    """The subset of the old-style plist syntax `project.pbxproj` uses."""
     pad = "\t" * indent
     if isinstance(value, dict):
-        return "{\n" + "".join(f"{pad}\t{json.dumps(k)} = {encode(v, indent+1)};\n" for k, v in value.items()) + pad + "}"
+        fields = "".join(f"{pad}\t{json.dumps(k)} = {encode(v, indent + 1)};\n"
+                         for k, v in value.items())
+        return "{\n" + fields + pad + "}"
     if isinstance(value, list):
-        return "(" + ", ".join(encode(x, indent) for x in value) + ")"
+        return "(" + ", ".join(encode(item, indent) for item in value) + ")"
     return json.dumps(value, ensure_ascii=False)
 
 project = ROOT / "OneClick.xcodeproj"
 project.mkdir(exist_ok=True)
-(project / "project.pbxproj").write_text("// !$*UTF8*$!\n" + encode(dict(archiveVersion=1, classes={}, objectVersion=77, objects=objects, rootObject=project_id)) + "\n")
+(project / "project.pbxproj").write_text(
+    "// !$*UTF8*$!\n"
+    + encode(dict(archiveVersion=1, classes={}, objectVersion=77,
+                  objects=objects, rootObject=project_id))
+    + "\n")
 schemes = project / "xcshareddata" / "xcschemes"
 schemes.mkdir(parents=True, exist_ok=True)
 ref = f'<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{app}" BuildableName="OneClick.app" BlueprintName="OneClick" ReferencedContainer="container:OneClick.xcodeproj"/>'
@@ -97,4 +114,6 @@ ref = f'<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{
   <ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
 </Scheme>
 ''')
-print(project)
+print(f"Wrote {project}")
+print(f"Wrote {schemes / 'OneClick.xcscheme'}")
+print("Re-running this must leave `git diff OneClick.xcodeproj` empty.")

@@ -12,11 +12,6 @@ struct ApplicationResolver {
         return executableApplication(NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier))
     }
 
-    func icon(for target: OpenTarget) -> NSImage? {
-        guard let url = applicationURL(for: target) else { return nil }
-        return NSWorkspace.shared.icon(forFile: url.path)
-    }
-
     private func executableApplication(_ url: URL?) -> URL? {
         guard let url, let executable = Bundle(url: url)?.executableURL,
               FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }

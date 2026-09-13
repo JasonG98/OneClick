@@ -29,6 +29,56 @@
 - 预览方法：`menudump` harness 用生产 `FinderMenuBuilder` 建菜单后 `NSMenu.popUp`，外部 `screencapture` 截图，因此**不必真的去点右键**就能迭代菜单外观。注意让 harness 读 `/tmp` 下的配置副本，直接读 App Group 容器会触发"访问其他 App 的数据"系统授权框。
 - 回归：**73 项** Swift 测试、6 项脚本测试、arm64 编译通过。
 
+## 菜单文案：长名应用用短名（2026-09-13）
+
+用户反馈：`用 Visual Studio Code 打开` 太长。做法是给常见长名应用一张**别名表**（`ApplicationAlias`，按 bundle id 匹配），菜单改印 `OpenTarget.menuName`；设置窗口、开关的无障碍标签和报错文案继续用应用全名。
+
+量法与上一节同一套：**调生产代码**（`FinderMenuBuilder.makeMenu`，见 `docs/testing.md` 的预览方法）建出菜单，再用菜单字体（`NSFont.menuFont(ofSize: 0)`）量每项标题宽度。**这个量法复现了上一节记录的 160.5 pt 基线**，所以两节的数字可比。harness 只建菜单、不 `popUp`、不截图，因此不会在桌面上弹东西。
+
+| 应用（全名） | 改前标题 | 改后标题 | 标题宽度 |
+| --- | --- | --- | --- |
+| Visual Studio Code | `用 Visual Studio Code 打开` | `用 VS Code 打开` | **160.5 pt → 98.3 pt** |
+| Sublime Text | `用 Sublime Text 打开` | `用 Sublime 打开` | 123.4 pt → 94.4 pt |
+| Visual Studio Code - Insiders | `用 Visual Studio Code - Insiders 打开` | `用 VS Code Insiders 打开` | 221.2 pt → 149.4 pt |
+| IntelliJ IDEA（折叠子菜单项） | `IntelliJ IDEA` | `IntelliJ` | 72.0 pt → 39.3 pt |
+| Terminal / Cursor（表里没有） | 同改前 | 同改前 | 51.4 / 40.7 pt 不变 |
+
+- 样例菜单改前的**最长标题 221.2 pt**、改后 **149.4 pt**；只看常见的那一档（VS Code）是 160.5 → 98.3 pt。Insiders 一档仍然最长，那是它本身名字就长——别名只能去掉 `Visual Studio Code` 里被省略的部分，不会把 16 个字符的短名再缩短。
+- Terminal 与 Cursor 的宽度**一模一样**，这是"表里没有就完全不变"的对照组：别名不是一条通用缩写规则，而是逐条显式收录。
+- 别名是**派生**的，不进 `settings.json`：没有 schema 变更、没有迁移、没有版本号变化，加一条别名不需要碰任何人的配置。测试里有一条专门钉住"别名不会被写进配置"。
+- 应用项本来就只在**目录选区**下出现，所以表里只收能用来打开文件夹的应用（不收录浏览器、聊天工具）。
+
+量法可复现（harness 在 `.build/ui-review/alias-width/`，进不了 Git，但命令很短）：把生产源码与这份 `main.swift` 一起编译后直接运行即可，它只 `makeMenu` 再量宽度，不 `popUp`、不截图，因此不会在桌面上弹菜单。`CLANG_MODULE_CACHE_PATH` 是给默认缓存在工作目录之外的环境用的。
+
+```sh
+CLANG_MODULE_CACHE_PATH="$PWD/.build/module-cache" xcrun swiftc -O -swift-version 6 \
+  -sdk "$(xcrun --sdk macosx --show-sdk-path)" -target arm64-apple-macos26.0 \
+  -o .build/ui-review/alias-width/aliaswidth \
+  .build/ui-review/alias-width/main.swift src/shared/core/*.swift src/shared/platform/*.swift
+.build/ui-review/alias-width/aliaswidth
+```
+
+**仍未验证：** Finder 里实际显示的文案需要真机点一次右键确认（属于 `docs/testing.md` 列的"仍未自动化"边界）；本次只确认到"生产代码建出的菜单项标题与宽度"。
+
+**已确认：** 76 项 Swift 测试通过；`check.sh --build` 下 **Finder 扩展 `OneClickFinder.appex` 编译并链接成功**（两个 target 都重新编出了 `ApplicationAlias.o`，时间戳晚于源文件）；主程序 target 只在 `SettingsModel.swift` 的 `@Observable` 宏上撞到 AGENTS.md 记录的环境限制（`swift-plugin-server ... produced malformed response`），该文件本次未改。
+
+## 复制项文案：`复制绝对路径` → `复制路径`（2026-09-13）
+
+用户要求：**应用里**改叫「复制路径」，**文档仍然说明复制的是绝对路径**。因此只动文案，不动动作。
+
+| 位置 | 改前 | 改后 |
+| --- | --- | --- |
+| 右键菜单（单选） | `复制绝对路径` | `复制路径` |
+| 右键菜单（多选） | `复制 2 个绝对路径` | `复制 2 个路径` |
+| Finder 工具栏按钮悬停提示 | `OneClick：用指定应用打开，或复制绝对路径` | `OneClick：用指定应用打开，或复制路径` |
+
+- 宽度（同上一节的量法）：`复制绝对路径` **77.4 pt → 51.6 pt**；`复制 2 个绝对路径` 105.2 pt → 79.4 pt。
+- **行为一字未改**：`ActionExecutor.copyPaths` 写入剪贴板的仍是 `SelectionContext.pathText`，逐行一个**绝对路径**（不转 `file://`、不加引号、符号链接按选中项本身）。README 用法一节保留了"复制到剪贴板的是绝对路径"这句说明，改的只是引号内的菜单文字。
+- 继续描述行为、不改的地方：README 顶部一句话仍是"或复制绝对路径"；`docs/superpowers/` 以及本文件、`docs/implementation-log.md` 里出现旧文案的段落是**当时的记录**，不回溯改写。
+- 验证：`./script/check.sh --disable-sandbox --filter FinderMenuTests`（10 项）与全量 `./script/check.sh --disable-sandbox` 通过，断言已同步为 `复制路径` / `复制 2 个路径`。`--build` 下扩展的 `OneClickFinder.debug.dylib` 在 11:07:22 重新链接，按 UTF-8 字节在二进制里核对：`复制路径` 命中、`复制绝对路径` 零命中。
+  - 同一轮里扩展 **stub**（`OneClickFinder`，调试用的空入口）的 `Ld` 报了 "failed with a nonzero exit code" 且没有错误正文：那是主程序 target 宏失败的**连带**结果（xcodebuild 在别的任务失败时终止同批任务），把日志里那条 `Ld` 命令原样单独重跑退出 0。主程序 target 本身仍受既有环境限制，与本改动无关。
+- 真机文案同样属于"仍未自动化"边界。
+
 ## 后台形态重做：扩展自足
 
 - **冷启动不开窗已修复，并更正了原因。** 原判是"Scene body 赋值晚于 AppKit 回调"的时序竞争，实测证伪：日志里完全没有 `Settings requested by ordinary launch`，说明 `applicationShouldOpenUntitledFile` **根本没有被调用**——它是文档型 App 的 `NSDocumentController` 回调，普通窗口 App 收不到。改用 `applicationDidFinishLaunching` 后，连续冷启动 **10/10 出窗**（修复前 0/10，bisect 确认 HEAD 同样 0/3，属既有缺陷）。展示请求早于场景安装时会被记录并在安装后重放，有 4 项测试覆盖。
@@ -115,7 +165,7 @@
 
 | 项目 | 证据 |
 | --- | --- |
-| Swift 核心行为 | `./script/test.sh --disable-sandbox -Xswiftc -warnings-as-errors`：40 项通过 |
+| Swift 核心行为 | `./script/check.sh --disable-sandbox -Xswiftc -warnings-as-errors`：40 项通过 |
 | 分发脚本行为 | `tests/release-scripts/run_tests.sh`：6 项通过；Bash 语法检查通过 |
 | Debug 构建与启动 | `./script/build_and_run.sh --verify` 成功，验证实际开发可执行文件进程 |
 | Release 归档 | `xcodebuild ... -configuration Release ... archive` 成功；归档在 `.build/OneClick.xcarchive` |
@@ -153,7 +203,7 @@
 | 扩展随重建退出且不自动恢复 | `pkill -f OneClickFinder.appex/...` 后 25 秒 `pgrep` 无输出；同一状态下 `killall Finder` 后进程立即出现 |
 | 注册路径可被改写到本次产物 | 恢复序列执行后 `pluginkit -m -v -i local.oneclick.app.finder` 显示路径为 `.build/DerivedData/.../OneClickFinder.appex`，进程 pid 随之变化 |
 | 构建脚本自动恢复扩展 | `./script/build_and_run.sh --verify` 输出 `Finder extension is running` 与 `Development OneClick is running (pid …)` |
-| 心跳文件 | 共享容器中 `extension-heartbeat.json` 的 `processIdentifier` 与 `pgrep` 到的扩展 pid 一致，`recordedAt` 为扩展启动时刻 |
+| 心跳文件（已被取代，见 `implementation-log.md` 的 2026-09-12 条目） | 共享容器中 `extension-heartbeat.json` 的 `processIdentifier` 与 `pgrep` 到的扩展 pid 一致，`recordedAt` 为扩展启动时刻 |
 | “未在运行”状态可达 | 杀掉扩展后心跳仍指向已死 pid，正是状态卡第三种状态的判据 |
 | 重新加载路径可用 | 被杀掉后执行 `pluginkit -e use -i local.oneclick.app.finder`，新 pid 出现，日志重新打印 `Observing 1 configured roots` / `Finder extension initialized` / `Finder began observing a configured directory` |
 | 回归 | `./script/check.sh --build --disable-sandbox` 通过：72 项 Swift 测试、6 项发布脚本测试、Shell 语法检查与 arm64 编译 |

@@ -63,8 +63,6 @@ final class SettingsHarness {
     let files: TemporaryFiles
     var availableIDs: Set<String> = ["test-terminal", "test-vscode"]
     var extensionEnabled = false
-    /// What the extension last wrote about itself, if anything.
-    var extensionHeartbeat: ExtensionHeartbeat?
     var extensionRunning = false
     var reloadSucceeds = true
     var reloadCount = 0
@@ -77,13 +75,10 @@ final class SettingsHarness {
             repository: { self.files.settings },
             homeDirectory: files.root,
             applicationURL: { self.availableIDs.contains($0.id) ? URL(fileURLWithPath: "/Applications/Test.app") : nil },
-            extensionEnabled: { self.extensionEnabled },
             extensionAvailability: {
                 ExtensionAvailabilityEvaluator(
                     isEnabled: self.extensionEnabled,
-                    heartbeat: self.extensionHeartbeat,
-                    isRunning: { _ in self.extensionRunning },
-                    now: { Date() }
+                    isRunning: { self.extensionRunning }
                 ).evaluate()
             },
             reloadExtension: {

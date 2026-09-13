@@ -12,23 +12,50 @@ struct FinderMenuTests {
         let files = try TemporaryFiles()
         let chosen = selection([try files.directory("folder")])
         let menu = try #require(builder.makeMenu(settings: Settings(targets: targets), selection: chosen, actions: &registry))
-        #expect(menu.items.last?.title == "复制绝对路径")
+        #expect(menu.items.last?.title == "复制路径")
         let openMenuItems = Array(menu.items.dropLast())
         let direct = Array(openMenuItems.prefix(3))
-        #expect(direct.map(\.title) == targets.prefix(3).map { "用 \($0.name) 打开" })
+        // 字面量而不是 targets.map(\.menuName)：这条断言的意义就是钉住菜单文案，
+        // 用被测代码算期望值等于什么都没测。样例里同时有别名命中（VS Code）
+        // 与未命中（Cursor）两种目标。
+        #expect(direct.map(\.title) == ["用 VS Code 打开", "用 Cursor 打开", "用 Sublime 打开"])
         #expect(direct.allSatisfy { $0.submenu == nil })
         var openItems = direct
         if count > 3 {
             #expect(openMenuItems.count == 4)
             #expect(openMenuItems[3].title == "用其他应用打开")
             let submenu = try #require(openMenuItems[3].submenu)
-            #expect(submenu.items.map(\.title) == targets.dropFirst(3).map(\.name))
+            #expect(submenu.items.map(\.title) == (count == 4 ? ["Terminal"] : ["Terminal", "Nova"]))
             openItems += submenu.items
         } else {
             #expect(openMenuItems.count == 3)
         }
         #expect(openItems.compactMap { registry.action(for: $0.tag)?.target?.id } == targets.map(\.id))
         #expect(openItems.allSatisfy { registry.action(for: $0.tag)?.selection.urls == chosen.urls })
+    }
+
+    /// 别名在内联项和折叠子菜单里都要生效。
+    ///
+    /// 排到第 4 位之后的应用一样占菜单宽度，只改内联项等于只做了一半。
+    /// 同时钉住一件容易做错的事：文案换了，点中的还得是原来那个目标。
+    @Test func aliasesApplyToFoldedItemsToo() throws {
+        let targets = [
+            OpenTarget(id: "cursor", name: "Cursor", kind: .application, bundleIdentifier: "com.todesktop.230313mzl4w4u92", applicationURL: nil, isEnabled: true),
+            OpenTarget(id: "nova", name: "Nova", kind: .application, bundleIdentifier: "com.panic.Nova", applicationURL: nil, isEnabled: true),
+            OpenTarget(id: "terminal", name: "Terminal", kind: .terminal, bundleIdentifier: "com.apple.Terminal", applicationURL: nil, isEnabled: true),
+            // 真实的长名字应用，别名表里应有它。
+            OpenTarget(id: "editor", name: "Visual Studio Code", kind: .application, bundleIdentifier: "com.microsoft.VSCode", applicationURL: nil, isEnabled: true),
+        ]
+        var registry = MenuActionRegistry()
+        let builder = FinderMenuBuilder(available: { _ in true }, icon: { _ in nil })
+        let files = try TemporaryFiles()
+        let menu = try #require(builder.makeMenu(settings: Settings(targets: targets), selection: selection([try files.directory("folder")]), actions: &registry))
+        let openItems = Array(menu.items.dropLast())
+
+        #expect(openItems.prefix(3).map(\.title) == ["用 Cursor 打开", "用 Nova 打开", "用 Terminal 打开"])
+        let folded = try #require(openItems.last?.submenu)
+        #expect(folded.items.map(\.title) == ["VS Code"])
+        #expect(registry.action(for: folded.items[0].tag)?.target?.name == "Visual Studio Code")
     }
 
     @Test func menuFiltersTargetsPreservesOrderAndSnapshotsSelection() throws {
@@ -41,7 +68,7 @@ struct FinderMenuTests {
         let chosen = selection([try files.directory("中文 + ' a"), try files.directory("b")])
         let menu = try #require(builder.makeMenu(settings: settings, selection: chosen, actions: &registry))
         let openItems = Array(menu.items.dropLast())
-        #expect(openItems.map(\.title) == ["用 Terminal 打开", "用 Visual Studio Code 打开"])
+        #expect(openItems.map(\.title) == ["用 Terminal 打开", "用 VS Code 打开"])
         #expect(openItems.allSatisfy { $0.submenu == nil && $0.tag > 0 })
         #expect(Set(openItems.map(\.tag)).count == 2)
         let action = try #require(registry.action(for: openItems[0].tag))
@@ -64,7 +91,7 @@ struct FinderMenuTests {
         let menu = try #require(builder.makeMenu(settings: Settings(targets: sampleTargets), selection: chosen, actions: &registry))
         #expect(menu.items.count == 1)
         let copy = try #require(menu.items.last)
-        #expect(copy.title == (mixed ? "复制 2 个绝对路径" : "复制绝对路径"))
+        #expect(copy.title == (mixed ? "复制 2 个路径" : "复制路径"))
         #expect(registry.action(for: copy.tag)?.selection.pathText == chosen.pathText)
         #expect(registry.action(for: copy.tag)?.target == nil)
     }
@@ -75,7 +102,7 @@ struct FinderMenuTests {
         var registry = MenuActionRegistry()
         let builder = FinderMenuBuilder(available: { _ in true }, icon: { _ in nil })
         let menu = try #require(builder.makeMenu(settings: Settings(), selection: background, actions: &registry))
-        #expect(menu.items.map(\.title) == ["用 Terminal 打开", "复制绝对路径"])
+        #expect(menu.items.map(\.title) == ["用 Terminal 打开", "复制路径"])
         #expect(registry.action(for: menu.items[0].tag)?.selection.urls == [files.root])
     }
 
@@ -84,7 +111,7 @@ struct FinderMenuTests {
         let builder = FinderMenuBuilder(available: { _ in false }, icon: { _ in nil })
         #expect(builder.makeMenu(settings: Settings(targets: sampleTargets), selection: selection([]), actions: &registry) == nil)
         let menu = builder.makeMenu(settings: Settings(targets: sampleTargets), selection: selection([URL(fileURLWithPath: "/tmp/a")]), actions: &registry)
-        #expect(menu?.items.map(\.title) == ["复制绝对路径"])
+        #expect(menu?.items.map(\.title) == ["复制路径"])
     }
 
     @Test func copyOnlyMenuUsesBackgroundDirectoryAndSingleItemTitle() throws {
@@ -93,7 +120,7 @@ struct FinderMenuTests {
         let background = SelectionContext(selected: [URL(fileURLWithPath: "/tmp/stale")], targeted: URL(fileURLWithPath: "/tmp/current"), isContainer: true)
         let menu = try #require(builder.makeMenu(settings: Settings(targets: sampleTargets), selection: background, actions: &registry))
         #expect(menu.items.count == 1)
-        #expect(menu.items[0].title == "复制绝对路径")
+        #expect(menu.items[0].title == "复制路径")
         #expect(registry.action(for: menu.items[0].tag)?.selection.pathText == "/tmp/current")
     }
 

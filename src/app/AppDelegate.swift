@@ -21,5 +21,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    /// Closing the settings window quits the app.
+    ///
+    /// The window is the whole product surface here: every action runs in the
+    /// Finder extension, and there is no background work left for the app to do
+    /// once it is closed. Staying alive only left a Dock icon and a running
+    /// process behind a window the user had already dismissed. Reopening still
+    /// works -- launching the app again presents the window, and the extension
+    /// relaunches it by bundle id when settings are requested from Finder.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }

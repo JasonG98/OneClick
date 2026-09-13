@@ -6,15 +6,16 @@
 
 | 测试 | 实际运行的生产逻辑 | 替换的系统边界 |
 | --- | --- | --- |
-| CoreTests | 文件选择与工作目录、路径编码、配置校验与旧版迁移、临时文件读写、主线程桥接、菜单快照 | 无 |
+| CoreTests | 文件选择与工作目录、路径编码、配置校验与旧版迁移、临时文件读写、主线程桥接、菜单快照、应用别名表与菜单名解析（含"别名不写进配置"） | 无 |
 | SettingsModelTests | 初次配置、持久化、开关、拖动及右键排序、应用/目录添加去重移除、刷新、读写错误 | Finder 状态、应用安装查询、通知和错误窗口 |
-| FinderMenuTests | NSMenu 构造、可用目标过滤与排序、空白处选择、复制菜单、工具栏菜单的设置入口、tag 对应的选择快照 | 应用查询和图标 |
+| FinderMenuTests | NSMenu 构造、可用目标过滤与排序、空白处选择、复制菜单、工具栏菜单的设置入口、tag 对应的选择快照、别名在内联项与折叠子菜单项上的文案 | 应用查询和图标 |
 | ActionExecutorTests | 编辑器/Terminal 分流，目录去重，特殊字符，失效选择，错误传递，复制文本 | NSWorkspace 和系统剪贴板 |
 | TargetAvailabilityCacheTests | 正结果缓存、负结果不缓存、失效后重查 | 应用解析与图标查询 |
 | AppGroupAccessTests | 缺少/错误签名必须在容器访问前失败；正确团队和不可用容器 | 受保护容器查询 |
-| AppLifecycleTests | 普通启动与重新打开请求设置、展示请求早于场景安装时被重放、关闭窗口不退出 | 设置窗口展示回调 |
-| ExtensionAvailabilityTests | 开关与进程两种事实的三种状态、心跳过期、空闲不失真；重新加载成功与失败后的提示 | Finder 扩展开关、进程存活查询、`pluginkit` |
+| AppLifecycleTests | 重新打开请求设置（含窗口已关闭）、关闭窗口即退出 | 设置窗口展示回调 |
+| ExtensionAvailabilityTests | 开关与进程两种事实的三种状态；重新加载成功与失败后的提示 | Finder 扩展开关、进程存活查询、`pluginkit` |
 | ReleaseScripts | 版本、架构、公证与 Cask 生成的输入输出和失败分支 | Apple/Homebrew 外部命令 |
+| IconPipeline | SVG 解析的拒绝路径、填充与描边的光栅化、PNG 编码、`Contents.json`，以及已提交的图标阶梯与美术稿逐字节一致 | 无（纯计算） |
 
 `tests/behavior/TestSupport.swift` 的替身只记录系统调用边界的参数和错误。配置仓库、菜单生成和动作分流始终使用生产实现；每个测试创建独立临时目录并在结束后清理。
 
@@ -23,24 +24,25 @@
 ```sh
 ./script/check.sh
 ./script/check.sh --build
-./script/test.sh --filter ActionExecutorTests
-./script/test.sh --filter FinderMenuTests
-./script/test.sh --enable-code-coverage
+./script/check.sh --filter ActionExecutorTests
+./script/check.sh --filter FinderMenuTests
+./script/check.sh --enable-code-coverage
+./script/check.sh --icons        # 额外组装 .icns 并核对十档尺寸
 ```
 
-SwiftPM 覆盖率文件位于 `.build/core/*/debug/codecov/`。嵌套沙盒环境可追加 `--disable-sandbox`；警告检查可追加 `-Xswiftc -warnings-as-errors`。组合示例：
+`check.sh` 只认 `--build` 和 `--icons`，其余参数原样交给 `swift test`，所以任何 SwiftPM 选项都能直接接在后面。SwiftPM 覆盖率文件位于 `.build/core/*/debug/codecov/`。警告检查可追加 `-Xswiftc -warnings-as-errors`。组合示例：
 
 ```sh
-./script/check.sh --build --disable-sandbox -Xswiftc -warnings-as-errors
+./script/check.sh --build -Xswiftc -warnings-as-errors
 ```
 
-编译检查产物独立放在 `.build/Checks`，日志在 `.build/logs/check-build.log`；不替换正在运行的签名开发版。Xcode 会自动注册 macOS 构建产物，脚本通过退出清理撤销检查产物的注册，构建失败时也会清理。
+编译检查产物独立放在 `.build/Checks`，日志在 `.build/logs/check-build.log`；不替换正在运行的签名开发版。Xcode 会自动注册 macOS 构建产物，脚本通过退出清理撤销检查产物的注册，构建失败时也会清理。即使清理失败留下登记，`build_and_run.sh` 也会在下次构建时按 bundle id 清掉 `.build/` 下的其它副本。
 
 ## GUI 验收边界
 
 Computer Use 用于自动化测试无法证明的部分：Finder 实际加载与菜单显示、工具栏按钮、系统权限对话框、真实应用接收行为、玻璃材质及布局。只有相关系统集成或视觉代码变更时才重测这些项目。设置增删、排序、分流、路径处理和错误分支的日常回归使用上面的测试。
 
-**沙盒授权无法用单元测试证明。** 扩展能否打开用户选中的文件完全取决于 `config/FinderExtension.entitlements` 里的只读例外；去掉它，`selectedItemURLs()` 交出的 URL 就不带沙盒读取权限，LaunchServices 会拒绝把任何文件交给任何应用（Apple 问题 rdar://42874694）。改 entitlement 后必须重跑两级探针：
+**这条只读权限无法用单元测试证明。** 扩展能否打开用户选中的文件完全取决于 `config/FinderExtension.entitlements` 里的只读权限；去掉它，`selectedItemURLs()` 交出的 URL 就不带读取授权，LaunchServices 会拒绝把任何文件交给任何应用（Apple 问题 rdar://42874694）。改 entitlement 后必须重跑两级探针：
 
 ```sh
 # 第一级：系统能力。用扩展构建产物的真实 entitlements 签名探针，
@@ -53,8 +55,8 @@ codesign --force --deep --sign "$(security find-identity -v -p codesigning | awk
 .build/ui-review/SandboxProbe.app/Contents/MacOS/SandboxProbe <文件> <目录>
 
 # 第二级：生产代码路径。把 ActionExecutor / SystemWorkspace 的源文件本身编进
-# 沙盒程序（注意必须加 -swift-version 6，否则默认参数的主 actor 隔离会报错），
-# 带例外与不带例外各跑一次做对照。
+# 一个以扩展 entitlements 签名的探针程序（注意必须加 -swift-version 6，否则
+# 默认参数的主 actor 隔离会报错），带这条权限与不带各跑一次做对照。
 ```
 
 第二级才是真正的证据：它跑的是扩展实际执行的代码，而不是探针副本；只改变唯一变量（那条 entitlement）就能得到成功/失败两种结果，因果关系没有别的解释空间。
@@ -70,8 +72,8 @@ codesign --force --deep --sign "$(security find-identity -v -p codesigning | awk
 ./script/build_and_run.sh --verify
 pluginkit -m -v -i local.oneclick.app.finder   # 路径必须是 .build/DerivedData 下刚构建的那份
 
-# 2. 心跳文件应当指向一个活着的扩展进程
-cat ~/Library/Group\ Containers/"$(grep DEVELOPMENT_TEAM config/Local.xcconfig | cut -d= -f2 | tr -d ' ')".local.oneclick.shared/extension-heartbeat.json
+# 2. 存活判据是进程注册表：app 侧走 NSRunningApplication，shell 侧就是这个
+pgrep -f OneClickFinder.appex
 
 # 3. 杀掉扩展模拟"开关还开着但进程已死"，再用恢复路径验证能起来
 pkill -f "OneClickFinder.appex/Contents/MacOS/OneClickFinder"
