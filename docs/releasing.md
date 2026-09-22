@@ -30,7 +30,8 @@ python3 script/release.py 0.1.0
 
 下载草稿附件验证安装和 Finder 操作后，再人工公开。
 如维护 Homebrew tap，将 `oneclick.rb` 放入 `JasonG98/homebrew-tap/Casks/`，在 release 公开后发布。
-远程 Actions、公开 tap 的安装/升级仍需实际验收，见[验收记录](verification.md)。
+公开 tap 的 DMG 地址必须支持匿名下载；私有仓库的 Release 不能直接作为公开下载源。
+远程构建和安装验收结果见[验收记录](verification.md)。
 
 ## 安装与卸载
 

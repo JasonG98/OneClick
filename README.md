@@ -14,8 +14,13 @@
 
 ## 安装与使用
 
-从 [Releases](https://github.com/JasonG98/OneClick/releases) 下载 DMG，将 OneClick 拖入 Applications。
-若还没有发布版本，可按下方命令从源码运行。
+通过 Homebrew 安装：
+
+```sh
+brew install --cask JasonG98/tap/oneclick
+```
+
+或从 [Releases](https://github.com/JasonG98/OneClick/releases) 下载 DMG，将 OneClick 拖入 Applications。
 
 应用使用 ad hoc 签名，未经 Apple 公证。下载后若被系统拦截，确认来源并核对附件中的 SHA-256，再执行：
 
