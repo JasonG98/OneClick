@@ -1,23 +1,12 @@
-"""Behaviour of script/uninstall.sh, exercised without touching this Mac.
+"""Test dry-run, ownership checks and failure handling in an isolated temporary home.
 
-The script removes applications, App Group containers and LaunchServices
-registrations, so every test here runs it against a temporary HOME with fake
-system tools on PATH: `lsregister`, `pluginkit`, `pgrep` and `pkill` are logged
-instead of executed. The script's own paths are what make that possible -- it
-never reaches for the real registrations when `ONECLICK_LSREGISTER` and
-`ONECLICK_PLUGINKIT` point somewhere else.
-
-What the tests are actually protecting:
-
-* the default run changes nothing,
-* ownership is read from the container's metadata, not from its name, so a
-  container that merely looks like OneClick's survives,
-* a bundle whose identifier is not OneClick's is never removed, and
-* a removal that fails is reported as a failure.
+System actions are replaced; legacy containers and repository data must survive.
 """
 
 import json
 import os
+import plistlib
+import shutil
 from pathlib import Path
 import stat
 import subprocess
@@ -36,8 +25,8 @@ FOREIGN_CREATOR = "com.jay.OneClick"
 
 def run(arguments, *, env):
     return subprocess.run(
-        [str(UNINSTALL_SCRIPT), *arguments],
-        cwd=ROOT,
+        [str(Path(env["ONECLICK_TEST_REPO"]) / "script/uninstall.sh"), *arguments],
+        cwd=env["ONECLICK_TEST_REPO"],
         env=env,
         text=True,
         stdout=subprocess.PIPE,
@@ -56,6 +45,13 @@ class UninstallScriptTests(unittest.TestCase):
         self.log = self.temp / "commands.jsonl"
         self.home.mkdir()
         self.bin.mkdir()
+        # The script discovers its repository from its own path. A fake HOME alone
+        # would still let --apply delete this checkout's real build products.
+        self.repository = self.temp / "repository"
+        (self.repository / "script").mkdir(parents=True)
+        (self.repository / ".build").mkdir()
+        for name in ("uninstall.sh",):
+            shutil.copy2(ROOT / "script" / name, self.repository / "script" / name)
         self._install_fake_tools()
         self._seed_machine()
 
@@ -67,6 +63,8 @@ class UninstallScriptTests(unittest.TestCase):
                 "FAKE_COMMAND_LOG": str(self.log),
                 "ONECLICK_LSREGISTER": str(self.bin / "lsregister"),
                 "ONECLICK_PLUGINKIT": str(self.bin / "pluginkit"),
+                "ONECLICK_TEST_REPO": str(self.repository),
+                "ONECLICK_APPLICATIONS_DIR": str(self.temp / "Applications"),
             }
         )
 
@@ -77,14 +75,26 @@ class UninstallScriptTests(unittest.TestCase):
 
     def _seed_machine(self):
         """One of everything the script claims, plus two things it must not."""
-        ours = self.home / "Library" / "Group Containers" / "AB12CD34EF.local.oneclick.shared"
+        self.shared = self.home / "Library/Application Support/OneClick"
+        self.shared.mkdir(parents=True)
+        (self.shared / "settings.json").write_text('{"version":1}')
+        (self.shared / ".oneclick-owner.plist").write_bytes(
+            plistlib.dumps({"CFBundleIdentifier": APP_ID})
+        )
+        ours = (
+            self.home / "Library" / "Group Containers" / "legacy.local.oneclick.shared"
+        )
         ours.mkdir(parents=True)
         (ours / "settings.json").write_text('{"version":1}')
-        self._write_metadata(ours / ".com.apple.containermanagerd.metadata.plist", APP_ID)
+        self._write_metadata(
+            ours / ".com.apple.containermanagerd.metadata.plist", APP_ID
+        )
 
         # Same name, different owner: an older project's container that has
         # nothing to do with this app.
-        foreign = self.home / "Library" / "Group Containers" / "group.local.oneclick.shared"
+        foreign = (
+            self.home / "Library" / "Group Containers" / "group.local.oneclick.shared"
+        )
         foreign.mkdir(parents=True)
         (foreign / "settings.json").write_text('{"legacy":true}')
         self._write_metadata(
@@ -114,30 +124,30 @@ class UninstallScriptTests(unittest.TestCase):
     def _install_fake_tools(self):
         self._write_executable(
             "lsregister",
-            r'''#!/bin/bash
+            r"""#!/bin/bash
 set -euo pipefail
 python3 - "$FAKE_COMMAND_LOG" lsregister "$@" <<'PY'
 import json, sys
 with open(sys.argv[1], "a") as stream:
     stream.write(json.dumps([sys.argv[2], *sys.argv[3:]]) + "\n")
 PY
-''',
+""",
         )
         self._write_executable(
             "pluginkit",
-            r'''#!/bin/bash
+            r"""#!/bin/bash
 set -euo pipefail
 python3 - "$FAKE_COMMAND_LOG" pluginkit "$@" <<'PY'
 import json, sys
 with open(sys.argv[1], "a") as stream:
     stream.write(json.dumps([sys.argv[2], *sys.argv[3:]]) + "\n")
 PY
-''',
+""",
         )
         for name in ("pgrep", "pkill"):
             self._write_executable(
                 name,
-                f'''#!/bin/bash
+                f"""#!/bin/bash
 python3 - "$FAKE_COMMAND_LOG" {name} "$@" <<'PY'
 import json, sys
 with open(sys.argv[1], "a") as stream:
@@ -146,7 +156,7 @@ PY
 # Nothing is running in these tests, but the exit status must be the one the
 # real tool would give: pgrep's non-zero "no match" must not trip `set -e`.
 exit 1
-''',
+""",
             )
 
     def _write_executable(self, name, content):
@@ -170,10 +180,19 @@ exit 1
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Report only", result.stdout)
         self.assertTrue(
-            (self.home / "Library" / "Group Containers" / "AB12CD34EF.local.oneclick.shared").exists()
+            (
+                self.home
+                / "Library"
+                / "Group Containers"
+                / "legacy.local.oneclick.shared"
+            ).exists()
         )
-        self.assertTrue((self.home / "Library" / "Preferences" / f"{APP_ID}.plist").exists())
+        self.assertTrue(
+            (self.home / "Library" / "Preferences" / f"{APP_ID}.plist").exists()
+        )
         self.assertTrue((self.home / "Library" / "Containers" / EXTENSION_ID).exists())
+        self.assertTrue(self.shared.exists())
+        self.assertIn(str(self.shared), result.stdout)
         # The report names what it would remove, rather than only counting it.
         self.assertIn(str(self.home), result.stdout)
         self.assertIn("would remove", result.stdout)
@@ -193,15 +212,25 @@ exit 1
         result = run(["--apply"], env=self.environment)
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(
-            (self.home / "Library" / "Group Containers" / "AB12CD34EF.local.oneclick.shared").exists()
+        self.assertTrue(
+            (
+                self.home
+                / "Library"
+                / "Group Containers"
+                / "legacy.local.oneclick.shared"
+            ).exists()
         )
         self.assertFalse((self.home / "Library" / "Containers" / APP_ID).exists())
         self.assertFalse((self.home / "Library" / "Containers" / EXTENSION_ID).exists())
-        self.assertFalse((self.home / "Library" / "Preferences" / f"{APP_ID}.plist").exists())
+        self.assertFalse(
+            (self.home / "Library" / "Preferences" / f"{APP_ID}.plist").exists()
+        )
+        self.assertFalse(self.shared.exists())
 
         # The container named like ours but owned by another app is untouched.
-        foreign = self.home / "Library" / "Group Containers" / "group.local.oneclick.shared"
+        foreign = (
+            self.home / "Library" / "Group Containers" / "group.local.oneclick.shared"
+        )
         self.assertTrue(foreign.exists())
         self.assertEqual((foreign / "settings.json").read_text(), '{"legacy":true}')
 
@@ -214,6 +243,37 @@ exit 1
         elections = [record for record in self._records() if record[0] == "pluginkit"]
         self.assertIn(EXTENSION_ID, elections[0])
 
+    def test_shared_directory_without_our_marker_is_preserved(self):
+        marker = self.shared / ".oneclick-owner.plist"
+        for owner in (None, "another.app"):
+            with self.subTest(owner=owner):
+                if owner is None:
+                    marker.unlink()
+                else:
+                    marker.write_bytes(plistlib.dumps({"CFBundleIdentifier": owner}))
+                result = run(["--apply"], env=self.environment)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue((self.shared / "settings.json").exists())
+                self.assertIn("preserved", result.stdout)
+
+    def test_shared_directory_symlink_is_never_followed(self):
+        other = self.home / "other"
+        self.shared.rename(other)
+        self.shared.symlink_to(other, target_is_directory=True)
+        result = run(["--apply"], env=self.environment)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.shared.is_symlink())
+        self.assertTrue((other / "settings.json").exists())
+
+    def test_marker_symlink_is_not_ownership_proof(self):
+        marker = self.shared / ".oneclick-owner.plist"
+        other = self.home / "foreign-marker.plist"
+        marker.rename(other)
+        marker.symlink_to(other)
+        result = run(["--apply"], env=self.environment)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.shared / "settings.json").exists())
+
     def test_apply_is_idempotent(self):
         first = run(["--apply"], env=self.environment)
         second = run(["--apply"], env=self.environment)
@@ -222,19 +282,16 @@ exit 1
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertIn("Removed 0 item(s)", second.stdout)
 
-    def test_repository_products_are_opt_in(self):
-        build = ROOT / ".build"
-        self.assertTrue(build.exists(), "this test needs the repository's build directory")
-
-        reported = run([], env=self.environment)
-        self.assertNotIn(str(build), reported.stdout)
-        self.assertIn("Add --build", reported.stdout)
-
-        # --build is asserted through the report only: running it with --apply
-        # would delete the build products of the checkout under test.
-        reported = run(["--build"], env=self.environment)
-        self.assertIn(str(build), reported.stdout)
-        self.assertTrue(build.exists())
+    def test_uninstall_preserves_build_products_and_legacy_configuration(self):
+        config = self.repository / "config/Local.xcconfig"
+        config.parent.mkdir()
+        config.write_text("private configuration")
+        result = run(["--apply"], env=self.environment)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.repository / ".build").exists())
+        self.assertEqual(config.read_text(), "private configuration")
+        for argument in ("--build", "--local-config"):
+            self.assertEqual(run([argument], env=self.environment).returncode, 2)
 
     def test_missing_home_is_a_usage_error(self):
         environment = self.environment.copy()

@@ -1,83 +1,51 @@
-# Preparing a OneClick release
+# 发布
 
-The repository contains a reproducible release-preparation workflow. It does not publish a GitHub Release or update a Homebrew tap. No GitHub repository, GitHub account, tap repository, or final download URL has been selected yet. This repository also has no verified, usable Developer ID Application identity at the time of writing, so a public release has not been produced.
+使用 ad hoc 签名，目标为 Apple Silicon / macOS 26+；无需 Apple 账号、证书或公证密钥。
 
-## Required Apple configuration
+## 本地打包
 
-Install a `Developer ID Application` certificate and private key in the signing keychain. Record its 10-character Apple Developer Team ID and the full identity name shown by:
-
-```bash
-security find-identity -v -p codesigning
+```sh
+./script/check.sh
+python3 script/release.py 0.1.0
 ```
 
-Store App Store Connect notarization credentials in a named Keychain profile. For example, one supported `notarytool` setup is:
+`release.py` 构建 Release，检查主程序和扩展的版本、arm64 架构与签名，再生成：
 
-```bash
-xcrun notarytool store-credentials oneclick-release \
-  --apple-id YOUR_APPLE_ID \
-  --team-id YOUR_TEAM_ID \
-  --password YOUR_APP_SPECIFIC_PASSWORD
-```
+- `dist/OneClick-0.1.0.dmg`（应用、Applications 链接和安装说明）
+- `dist/OneClick-0.1.0.dmg.sha256`
+- `dist/oneclick.rb`（使用该 DMG 的实际哈希）
 
-Do not add the Apple ID, app-specific password, private key, or exported certificate to the repository. The release script receives only the Keychain profile name.
+所有检查成功后才替换产物。可用 `ONECLICK_DERIVED_DATA_PATH`、`ONECLICK_DIST_DIR` 调整目录；同一目录只运行一个构建。
 
-## Build, sign, and notarize
+## CI/CD
 
-Run the script with a plain `MAJOR.MINOR.PATCH` version and all three required environment variables:
+`check.yml` 在 push / PR 时检查工程生成结果，运行测试和无签名编译。
+`release.yml` 在 `vMAJOR.MINOR.PATCH` tag push 或手动选择已有 tag 时运行，只有一个任务：
+检出并核对 tag → 测试 → 打包 → 创建 GitHub **草稿**。
 
-```bash
-ONECLICK_TEAM_ID=AB12CD34EF \
-ONECLICK_SIGNING_IDENTITY='Developer ID Application: Example Developer (AB12CD34EF)' \
-ONECLICK_NOTARY_PROFILE=oneclick-release \
-./script/release.sh 1.2.3
-```
+维护者完成审阅、桌面验证和许可证选择后提交代码，再推送版本 tag。
+流水线用 GitHub 提供的 token，无额外签名 secrets。手动上传可执行
+`python3 script/release.py 0.1.0 --draft`，要求当前提交匹配 tag 且工作区干净（包括未跟踪文件）。
+同 tag 可刷新草稿附件；已公开的 release 拒绝修改。修复已发布版本时使用新版本号。
 
-The script rejects missing or unsafe configuration before starting Xcode. It builds the `OneClick` scheme into `.build/ReleaseDerivedData` with these release overrides:
+下载草稿附件验证安装和 Finder 操作后，再人工公开。
+如维护 Homebrew tap，将 `oneclick.rb` 放入 `JasonG98/homebrew-tap/Casks/`，在 release 公开后发布。
+远程 Actions、公开 tap 的安装/升级仍需实际验收，见[验收记录](verification.md)。
 
-- `ARCHS=arm64` and `ONLY_ACTIVE_ARCH=NO`
-- `DEVELOPMENT_TEAM=<Team ID>`
-- `CODE_SIGN_IDENTITY=<Developer ID Application identity>`
-- `ONECLICK_APP_GROUP=<Team ID>.local.oneclick.shared`
-- `MARKETING_VERSION=<release version>`
+## 安装与卸载
 
-Xcode signs the app and embedded Finder extension with their configured entitlements and Hardened Runtime settings. The script then verifies that both Mach-O executables contain only `arm64`, checks the app and extension version metadata, runs strict nested signature verification, creates a temporary ZIP for `notarytool`, waits for notarization, staples and validates the app, and asks Gatekeeper to assess it. Only after those checks does it create `dist/OneClick-<version>.zip` and print its SHA-256.
+应用未公证，下载后可能被 Gatekeeper 拦截；确认来源和 SHA-256 后，按 [README](../README.md) 操作。
+Cask 只提示解锁命令，不自动移除 quarantine。
+`uninstall.sh` 默认只报告，`--apply` 执行；应用按 bundle ID、共享目录按归属标记确认。
+旧 Group Containers、仓库构建目录和本地配置保留。
 
-`release.sh` submits to Apple's notarization service, but it does not upload to GitHub or modify a tap. A successful local run is release preparation; publication still requires a chosen GitHub repository and tap plus a deliberate upload/update step.
+## 旧版配置迁移
 
-## Generate the Cask
+新版使用 `~/Library/Application Support/OneClick/`，不会读取或清理旧 App Group。
 
-After uploading the exact final ZIP to a stable HTTPS GitHub Release URL, generate the Cask. `release.sh` already wrote `dist/OneClick-<version>.zip`, so the archive path can be left out:
+1. 打开新版创建目录后，关闭设置和 Finder 扩展。
+2. 找到确属旧 OneClick 的容器（如 `~/Library/Group Containers/<Team ID>.local.oneclick.shared/`）。
+3. 备份新目录的 `settings.json`，用旧文件替换它，保留新版 `.oneclick-owner.plist`。
+4. 重新打开，核对应用与目录配置，再启用扩展。
 
-```bash
-./script/generate_cask.sh \
-  1.2.3 \
-  https://github.com/OWNER/REPOSITORY/releases/download/v1.2.3/OneClick-1.2.3.zip \
-  https://github.com/OWNER/REPOSITORY
-```
-
-Pass an archive path as a fourth argument to generate the Cask for a different file. The path must exist either way; the default is resolved against `ONECLICK_DIST_DIR` (default `dist/`).
-
-The generated Cask is written to standard output. It uses the measured archive SHA-256, installs `OneClick.app`, requires Apple Silicon, and requires macOS Tahoe or newer. The generator accepts only plain release versions and conservative HTTPS URLs; it rejects missing archives and values that could become Ruby interpolation or quoting syntax. A wrong invocation exits 2, a rejected value exits 1, and neither writes to standard output.
-
-To update a tap file without truncating an existing Cask when validation fails, write to a temporary file first, check it, and then move it into the tap:
-
-```bash
-temporary_cask="$(mktemp)"
-./script/generate_cask.sh \
-  1.2.3 \
-  https://github.com/OWNER/REPOSITORY/releases/download/v1.2.3/OneClick-1.2.3.zip \
-  https://github.com/OWNER/REPOSITORY > "$temporary_cask" \
-  && ruby -c "$temporary_cask"
-```
-
-Move the checked file to `Casks/oneclick.rb` only after the repository and tap locations are known. Before announcing a release, download the published asset independently, compare its SHA-256, and test Cask install, upgrade, and uninstall on an Apple Silicon Mac running macOS 26 or newer.
-
-## Script tests
-
-The release-script tests use temporary fake Xcode, signing, and notarization commands. They exercise validation, argument boundaries, exit statuses, operation ordering, architecture rejection, final archive creation, generated SHA-256 values, generated Ruby syntax, and the Cask generator's default archive resolution without contacting Apple or a release host:
-
-```bash
-tests/release-scripts/run_tests.sh
-```
-
-These tests prove the orchestration and Cask generation behavior. A real release still requires a valid Developer ID identity, a working Keychain notarization profile, successful Apple notarization, and actual GitHub/tap values.
+非空且无归属标记的目录不会被自动认领；先备份移走，让应用重新创建，勿给未知目录补标记。

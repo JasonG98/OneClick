@@ -1,2 +1,5 @@
-// Set DEVELOPMENT_TEAM in the ignored Local.xcconfig, or pass it to xcodebuild.
-#include? "Local.xcconfig"
+// No Apple account, certificate, or provisioning profile is required.
+// Legacy Local.xcconfig stays ignored but is deliberately no longer included.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =

@@ -1,19 +1,8 @@
-"""Repository hygiene: the real signing details never enter version control.
+"""Legacy local signing details remain private even though builds no longer use them.
 
-`config/Local.xcconfig` holds `DEVELOPMENT_TEAM`, and the App Group identifier
-is that team id with a fixed suffix, so the same string also shows up in any
-path written next to a container. Neither belongs in a commit: the team id
-identifies the developer account, and the file exists precisely so that local
-signing configuration can differ per machine.
-
-What the tests are actually protecting:
-
-* the ignored local configuration is never tracked, and
-* the team id it holds appears nowhere in the working tree, so a path pasted
-  into a document cannot carry it into history.
-
-Build products are skipped, not exempt by accident: `.build/` contains the
-signed extension with the expanded group identifier inside its binary.
+Old config/Local.xcconfig files may still contain a real DEVELOPMENT_TEAM.
+Preserve the ignored-file and working-tree leak checks until those local
+files have been explicitly removed by their owner.
 """
 
 import os
@@ -45,7 +34,9 @@ def local_team_id():
 
 def working_tree_files():
     for directory, subdirectories, filenames in os.walk(ROOT):
-        subdirectories[:] = [name for name in subdirectories if name not in SKIPPED_DIRECTORIES]
+        subdirectories[:] = [
+            name for name in subdirectories if name not in SKIPPED_DIRECTORIES
+        ]
         for filename in filenames:
             path = Path(directory) / filename
             if path != LOCAL_CONFIG:
@@ -89,7 +80,8 @@ class RepositoryHygieneTests(unittest.TestCase):
             offenders,
             [],
             "the real team id appears outside config/Local.xcconfig; "
-            "write <Team ID> in documents and fixtures instead: " + ", ".join(sorted(offenders)),
+            "write <Team ID> in documents and fixtures instead: "
+            + ", ".join(sorted(offenders)),
         )
 
 
