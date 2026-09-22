@@ -16,5 +16,8 @@
       access; it is granted to the extension only, never to the app.
     -->
     <key>com.apple.security.temporary-exception.files.absolute-path.read-only</key><array><string>/</string></array>
-    <key>com.apple.security.application-groups</key><array><string>$(ONECLICK_APP_GROUP)</string></array>
+    <!-- Shared settings and bounded error reports; relative to the real home,
+         not the extension container. A directory exception needs a final /. -->
+    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+    <array><string>/Library/Application Support/OneClick/</string></array>
 </dict></plist>

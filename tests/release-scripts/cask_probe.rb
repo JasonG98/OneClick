@@ -10,10 +10,18 @@ class CaskProbe
     }
   end
 
-  %w[version sha256 url name desc homepage app].each do |stanza|
+  %w[version sha256 url name desc homepage app caveats].each do |stanza|
     define_method(stanza) do |value|
       @values[stanza] = value
     end
+  end
+
+  def appdir
+    "/Applications"
+  end
+
+  def uninstall(**options)
+    @values["uninstall"] = options
   end
 
   def depends_on(**requirements)

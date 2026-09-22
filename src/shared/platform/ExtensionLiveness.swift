@@ -24,8 +24,8 @@ enum ExtensionLiveness {
     /// Only the app asks this, and only the app may: the query needs the
     /// process registry, which a sandboxed caller cannot see. The extension is
     /// sandboxed; its container app deliberately is not (`config/` — the
-    /// extension carries an app-sandbox entitlement, the app carries only the
-    /// app group). Sandboxing the app would turn every answer false.
+    /// extension carries an app-sandbox entitlement, the app has no sandbox
+    /// or App Group entitlement). Sandboxing the app would turn every answer false.
     static func isRunning(extension appex: URL?) -> Bool {
         guard let appex, let identifier = Bundle(url: appex)?.bundleIdentifier else { return false }
         return !NSRunningApplication.runningApplications(withBundleIdentifier: identifier).isEmpty
